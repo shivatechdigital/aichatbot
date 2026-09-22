@@ -1,0 +1,16 @@
+services:
+  quotation-ai:
+    build: .
+    container_name: quotation-ai-arena
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: http://host.docker.internal:3010/v1/chat/completions
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

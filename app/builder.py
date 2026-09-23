@@ -1,4 +1,4 @@
-"""Website Builder workspace for creating and previewing small web projects."""
+"""Website Builder workspace - Production Level UI."""
 
 import html
 import importlib.util
@@ -43,6 +43,12 @@ h1 { max-width: 620px; margin: 8px 0; font-size: clamp(42px, 8vw, 88px); line-he
 """,
 }
 
+FILE_ICONS = {
+    "index.html": ("HTML", "#e34c26"),
+    "style.css": ("CSS", "#2965f1"),
+    "script.js": ("JS", "#f7df1e"),
+}
+
 
 def _project_document(files: dict[str, str]) -> str:
     index = files.get("index.html", DEFAULT_FILES["index.html"])
@@ -76,8 +82,599 @@ def _parse_generated_files(response: str) -> dict[str, str]:
     return files
 
 
+BUILDER_CSS = """
+<style>
+/* ============ BUILDER GLOBAL ============ */
+.builder-root {
+    height: 100vh;
+    background: #0a0a0f;
+    color: #e8e8ed;
+    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    overflow: hidden;
+}
+
+.builder-root * {
+    box-sizing: border-box;
+}
+
+/* ============ SIDEBAR ============ */
+.b-sidebar {
+    width: 280px !important;
+    height: 100vh;
+    padding: 0 !important;
+    background: #0f0f16;
+    border-right: 1px solid #1e1e2a;
+    display: flex;
+    flex-direction: column;
+    gap: 0 !important;
+    flex-shrink: 0;
+}
+
+.b-sidebar-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid #1e1e2a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.b-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.b-brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.b-brand-text {
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.2px;
+}
+
+.b-back-btn {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    color: #8b8b98 !important;
+    background: transparent !important;
+    border-radius: 8px !important;
+}
+.b-back-btn:hover {
+    color: #fff !important;
+    background: #1e1e2a !important;
+}
+
+.b-section {
+    padding: 18px 20px 12px;
+}
+
+.b-section-label {
+    color: #6b6b7e;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+}
+
+/* Select styling */
+.b-select .q-field__control {
+    background: #16161f !important;
+    border: 1px solid #24243a !important;
+    border-radius: 10px !important;
+    color: #e8e8ed !important;
+    min-height: 42px !important;
+    padding: 0 12px !important;
+}
+.b-select .q-field__control:hover {
+    border-color: #33334f !important;
+}
+.b-select .q-field__control:before,
+.b-select .q-field__control:after {
+    display: none !important;
+}
+.b-select .q-field__native,
+.b-select .q-field__input {
+    color: #e8e8ed !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+.b-select .q-icon {
+    color: #8b8b98 !important;
+}
+
+/* New Project Button */
+.b-new-btn {
+    width: 100%;
+    margin-top: 10px !important;
+    background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    min-height: 42px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.2px !important;
+    text-transform: none !important;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+.b-new-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45) !important;
+}
+
+/* File List */
+.b-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 12px;
+}
+
+.b-file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: #b8b8c8;
+    font-size: 13px;
+    border: 1px solid transparent;
+}
+
+.b-file-item:hover {
+    background: #16161f;
+    color: #fff;
+}
+
+.b-file-item.active {
+    background: #1a1a2e;
+    color: #fff;
+    border-color: #33335a;
+}
+
+.b-file-tag {
+    width: 30px;
+    height: 22px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+}
+
+/* Save button */
+.b-save-btn {
+    width: 100%;
+    background: #16161f !important;
+    color: #e8e8ed !important;
+    border: 1px solid #24243a !important;
+    border-radius: 10px !important;
+    min-height: 40px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    letter-spacing: 0.2px !important;
+    margin-top: 12px !important;
+    transition: all 0.2s ease !important;
+}
+.b-save-btn:hover {
+    background: #1e1e2a !important;
+    border-color: #33335a !important;
+}
+
+.b-sidebar-footer {
+    margin-top: auto;
+    padding: 16px 20px;
+    border-top: 1px solid #1e1e2a;
+}
+
+.b-footer-info {
+    color: #5b5b6e;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+/* ============ MAIN AREA ============ */
+.b-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0f;
+    overflow: hidden;
+}
+
+.b-toolbar {
+    height: 62px;
+    flex-shrink: 0;
+    padding: 0 24px;
+    background: #0f0f16;
+    border-bottom: 1px solid #1e1e2a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.b-toolbar-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.b-toolbar-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #f97316, #ec4899);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+}
+
+.b-toolbar-heading {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+.b-toolbar-sub {
+    color: #6b6b7e;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.b-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: #16161f;
+    border: 1px solid #24243a;
+    border-radius: 20px;
+    color: #a8a8b8;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.b-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b98188;
+}
+
+/* ============ WORKSPACE ============ */
+.b-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    gap: 0;
+    overflow: hidden;
+}
+
+.b-editor-col {
+    flex: 1 1 50%;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0f;
+    border-right: 1px solid #1e1e2a;
+    overflow: hidden;
+}
+
+.b-preview-col {
+    flex: 1 1 50%;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0f;
+    overflow: hidden;
+}
+
+/* Panel headers */
+.b-panel-head {
+    height: 44px;
+    flex-shrink: 0;
+    padding: 0 18px;
+    background: #0f0f16;
+    border-bottom: 1px solid #1e1e2a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.b-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b8b8c8;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.b-panel-dot {
+    display: inline-flex;
+    gap: 5px;
+}
+.b-panel-dot span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #33334f;
+}
+.b-panel-dot span:nth-child(1) { background: #ff5f57; }
+.b-panel-dot span:nth-child(2) { background: #febc2e; }
+.b-panel-dot span:nth-child(3) { background: #28c840; }
+
+.b-current-file {
+    color: #6b6b7e;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+/* Editor */
+.b-editor-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 !important;
+    display: flex;
+    overflow: hidden;
+    background: #0d0d15;
+}
+
+.b-editor-body .q-field {
+    width: 100%;
+    height: 100%;
+}
+
+.b-editor-body .q-field__control {
+    background: transparent !important;
+    padding: 0 !important;
+    border: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+}
+
+.b-editor-body .q-field__control:before,
+.b-editor-body .q-field__control:after {
+    display: none !important;
+}
+
+.b-editor-body .q-field__label {
+    display: none !important;
+}
+
+.b-editor-body textarea {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 18px 22px !important;
+    background: #0d0d15 !important;
+    color: #e8e8ed !important;
+    font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace !important;
+    font-size: 13px !important;
+    line-height: 1.7 !important;
+    border: 0 !important;
+    outline: none !important;
+    resize: none !important;
+    caret-color: #8b5cf6;
+}
+
+.b-editor-body textarea::-webkit-scrollbar { width: 10px; }
+.b-editor-body textarea::-webkit-scrollbar-track { background: #0d0d15; }
+.b-editor-body textarea::-webkit-scrollbar-thumb {
+    background: #24243a;
+    border-radius: 5px;
+    border: 2px solid #0d0d15;
+}
+.b-editor-body textarea::-webkit-scrollbar-thumb:hover { background: #33335a; }
+
+/* AI Prompt Bar */
+.b-prompt-bar {
+    flex-shrink: 0;
+    padding: 14px 18px;
+    background: #0f0f16;
+    border-top: 1px solid #1e1e2a;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.b-prompt-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b8b8c8;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.b-prompt-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    background: linear-gradient(135deg, #8b5cf622, #6366f122);
+    border: 1px solid #8b5cf655;
+    border-radius: 6px;
+    color: #a78bfa;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.b-prompt-input {
+    width: 100%;
+}
+
+.b-prompt-input .q-field__control {
+    background: #16161f !important;
+    border: 1px solid #24243a !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    min-height: 80px !important;
+    transition: border-color 0.2s ease !important;
+}
+
+.b-prompt-input .q-field__control:hover {
+    border-color: #33335a !important;
+}
+
+.b-prompt-input:focus-within .q-field__control {
+    border-color: #8b5cf6 !important;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12) !important;
+}
+
+.b-prompt-input .q-field__control:before,
+.b-prompt-input .q-field__control:after {
+    display: none !important;
+}
+
+.b-prompt-input .q-field__label {
+    display: none !important;
+}
+
+.b-prompt-input textarea {
+    padding: 12px 14px !important;
+    background: transparent !important;
+    color: #e8e8ed !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    border: 0 !important;
+    outline: none !important;
+    resize: none !important;
+    min-height: 60px !important;
+}
+
+.b-prompt-input textarea::placeholder {
+    color: #5b5b6e !important;
+}
+
+.b-generate-btn {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #8b5cf6, #ec4899) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    padding: 0 20px !important;
+    min-height: 40px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    letter-spacing: 0.2px !important;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.b-generate-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 22px rgba(236, 72, 153, 0.4) !important;
+}
+
+.b-generate-btn:disabled {
+    opacity: 0.6 !important;
+    transform: none !important;
+}
+
+/* Preview */
+.b-preview-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 18px;
+    background: #0a0a0f;
+    overflow: hidden;
+}
+
+.b-preview-frame-wrap {
+    width: 100%;
+    height: 100%;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    border: 1px solid #1e1e2a;
+}
+
+.builder-preview-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: white;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .b-workspace { flex-direction: column; overflow-y: auto; }
+    .b-editor-col, .b-preview-col { flex: 0 0 auto; min-height: 400px; }
+    .b-editor-col { border-right: 0; border-bottom: 1px solid #1e1e2a; }
+    .b-sidebar { width: 220px !important; }
+}
+
+/* Menu (dropdown) dark */
+.q-menu {
+    background: #16161f !important;
+    border: 1px solid #24243a !important;
+    color: #e8e8ed !important;
+}
+.q-menu .q-item {
+    color: #e8e8ed !important;
+    min-height: 38px !important;
+}
+.q-menu .q-item:hover {
+    background: #1e1e2a !important;
+}
+
+/* Loading state */
+.b-generate-btn.loading {
+    background: #33335a !important;
+    cursor: wait !important;
+}
+</style>
+"""
+
+
 @ui.page("/builder")
 def builder_page() -> None:
+    ui.add_head_html(BUILDER_CSS)
+    ui.add_head_html(
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">'
+    )
+
     projects = db.get_all_projects()
     if not projects:
         project_id = db.create_project()
@@ -89,8 +686,9 @@ def builder_page() -> None:
     editor = None
     preview = None
     project_select = None
-    file_select = None
     status = None
+    current_file_label = None
+    file_items = {}
 
     def load_files() -> dict[str, str]:
         return {item["path"]: item["content"] for item in db.get_project_files(state["project_id"])}
@@ -98,28 +696,46 @@ def builder_page() -> None:
     def update_preview() -> None:
         if preview is not None:
             preview.set_content(
+                '<div class="b-preview-frame-wrap">'
                 '<iframe class="builder-preview-frame" sandbox="allow-scripts" '
                 f'srcdoc="{html.escape(_project_document(load_files()), quote=True)}"></iframe>'
+                '</div>'
             )
 
-    def load_editor() -> None:
-        files = load_files()
-        path = file_select.value if file_select else state["path"]
+    def set_status(text: str, color: str = "#10b981") -> None:
+        if status is not None:
+            status.clear()
+            with status:
+                ui.html(f'<span class="b-status-dot" style="background:{color};box-shadow:0 0 8px {color}88"></span>')
+                ui.label(text)
+
+    def refresh_file_highlights():
+        for path, item in file_items.items():
+            if path == state["path"]:
+                item.classes(add="active")
+            else:
+                item.classes(remove="active")
+        if current_file_label:
+            current_file_label.set_text(state["path"])
+
+    def select_file(path: str):
         state["path"] = path
+        files = load_files()
         if editor is not None:
             editor.value = files.get(path, "")
-        update_preview()
+        refresh_file_highlights()
 
     def choose_project(event) -> None:
         state["project_id"] = int(event.value)
         state["path"] = "index.html"
-        file_select.value = state["path"]
-        load_editor()
+        select_file("index.html")
+        update_preview()
 
     def save_file() -> None:
         db.save_project_file(state["project_id"], state["path"], editor.value)
-        status.set_text("Saved")
+        set_status("Saved", "#10b981")
         update_preview()
+        ui.notify(f"✓ {state['path']} saved", type="positive", position="bottom-right")
 
     def new_project() -> None:
         project_id = db.create_project()
@@ -135,11 +751,14 @@ def builder_page() -> None:
             ui.notify("Describe the website you want to build.", type="warning")
             return
         generate_button.disable()
-        status.set_text("Generating files...")
+        generate_button.classes(add="loading")
+        generate_button.set_text("Generating...")
+        set_status("AI is generating...", "#8b5cf6")
         try:
             instruction = (
-                "Create a responsive website using only index.html, style.css, and script.js. "
-                "Return only these sections, with no extra explanation:\n"
+                "Create a responsive, modern, production-quality website using only "
+                "index.html, style.css, and script.js. Use beautiful typography, "
+                "spacing, and colors. Return only these sections, with no extra explanation:\n"
                 "### FILE: index.html\n```html\n...\n```\n"
                 "### FILE: style.css\n```css\n...\n```\n"
                 "### FILE: script.js\n```javascript\n...\n```\n\n"
@@ -153,53 +772,125 @@ def builder_page() -> None:
                 raise ValueError("The model did not return valid website files.")
             for path, content in files.items():
                 db.save_project_file(state["project_id"], path, content)
-            load_editor()
-            status.set_text("Website generated and saved")
+            select_file(state["path"])
+            update_preview()
+            set_status("Generated successfully", "#10b981")
+            ui.notify("✨ Website generated!", type="positive", position="bottom-right")
         except Exception as error:
-            status.set_text("Generation failed")
+            set_status("Generation failed", "#ef4444")
             ui.notify(str(error), type="negative")
         finally:
             generate_button.enable()
+            generate_button.classes(remove="loading")
+            generate_button.set_text("Generate")
 
-    with ui.row().classes("builder-shell w-full h-screen gap-0 no-wrap"):
-        with ui.column().classes("builder-sidebar h-full shrink-0"):
-            with ui.row().classes("items-center justify-between"):
-                ui.label("Website Builder").classes("text-lg font-semibold")
+    # ============ UI STRUCTURE ============
+    with ui.row().classes("builder-root w-full no-wrap gap-0"):
+
+        # ---------- SIDEBAR ----------
+        with ui.column().classes("b-sidebar"):
+
+            # Header
+            with ui.element("div").classes("b-sidebar-header"):
+                with ui.element("div").classes("b-brand"):
+                    ui.html('<div class="b-brand-icon">✦</div>')
+                    ui.html('<span class="b-brand-text">Website Builder</span>')
                 ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")) \
-                    .props("flat round dense aria-label='Back to chat'")
-            ui.label("Projects").classes("small-muted")
-            project_select = ui.select(
-                options={str(project["id"]): project["name"] for project in projects},
-                value=str(state["project_id"]),
-                on_change=choose_project,
-            ).classes("w-full")
-            ui.button("New project", icon="add", on_click=new_project) \
-                .props("flat align=left")
-            ui.separator()
-            ui.label("Files").classes("small-muted")
-            file_select = ui.select(
-                options=["index.html", "style.css", "script.js"],
-                value="index.html",
-                on_change=lambda _event: load_editor(),
-            ).classes("w-full")
-            ui.button("Save file", icon="save", on_click=save_file).props("unelevated")
+                    .props("flat dense").classes("b-back-btn")
 
-        with ui.column().classes("builder-main flex-1 min-w-0 h-full"):
-            with ui.row().classes("builder-toolbar w-full items-center justify-between"):
-                ui.label("Create a website with AI").classes("text-xl font-semibold")
-                status = ui.label("Ready").classes("small-muted")
-            with ui.row().classes("builder-workspace w-full flex-1 min-h-0 no-wrap"):
-                with ui.column().classes("builder-editor-panel flex-1 min-w-0 h-full"):
-                    editor = ui.textarea(label="index.html").classes("builder-editor w-full flex-1")
-                    builder_prompt = ui.textarea(
-                        label="Describe the website or change",
-                        placeholder="Create a premium responsive website for a beauty parlour...",
-                    ).classes("builder-prompt w-full")
-                    generate_button = ui.button(
-                        "Generate website", icon="auto_awesome", on_click=generate_project
-                    ).props("unelevated")
-                with ui.column().classes("builder-preview-panel flex-1 min-w-0 h-full"):
-                    ui.label("Live preview").classes("text-sm font-semibold")
-                    preview = ui.html().classes("builder-preview flex-1 w-full")
+            # Projects Section
+            with ui.element("div").classes("b-section"):
+                ui.html('<div class="b-section-label">Project</div>')
+                project_select = ui.select(
+                    options={str(project["id"]): project["name"] for project in projects},
+                    value=str(state["project_id"]),
+                    on_change=choose_project,
+                ).props("outlined dense options-dense").classes("b-select w-full")
 
-    load_editor()
+                ui.button("＋  New Project", on_click=new_project) \
+                    .props("unelevated no-caps").classes("b-new-btn")
+
+            # Files Section
+            with ui.element("div").classes("b-section"):
+                ui.html('<div class="b-section-label">Files</div>')
+                with ui.element("div").classes("b-file-list").style("padding:0"):
+                    for path in ["index.html", "style.css", "script.js"]:
+                        tag, color = FILE_ICONS[path]
+                        item = ui.element("div").classes(
+                            "b-file-item" + (" active" if path == "index.html" else "")
+                        )
+                        with item:
+                            ui.html(f'<div class="b-file-tag" style="background:{color}">{tag}</div>')
+                            ui.label(path)
+                        item.on("click", lambda _e=None, p=path: select_file(p))
+                        file_items[path] = item
+
+                ui.button("💾  Save File", on_click=save_file) \
+                    .props("unelevated no-caps").classes("b-save-btn")
+
+            # Footer
+            with ui.element("div").classes("b-sidebar-footer"):
+                ui.html('<div class="b-footer-info">Build beautiful websites<br>with AI in seconds ✨</div>')
+
+        # ---------- MAIN AREA ----------
+        with ui.column().classes("b-main gap-0"):
+
+            # Toolbar
+            with ui.element("div").classes("b-toolbar"):
+                with ui.element("div").classes("b-toolbar-title"):
+                    ui.html('<div class="b-toolbar-icon">✨</div>')
+                    with ui.column().classes("gap-0"):
+                        ui.html('<div class="b-toolbar-heading">Create a website with AI</div>')
+                        ui.html('<div class="b-toolbar-sub">Design, edit, and preview in real time</div>')
+
+                status = ui.element("div").classes("b-status")
+                with status:
+                    ui.html('<span class="b-status-dot"></span>')
+                    ui.label("Ready")
+
+            # Workspace
+            with ui.row().classes("b-workspace w-full no-wrap gap-0"):
+
+                # LEFT: Editor + AI Prompt
+                with ui.column().classes("b-editor-col gap-0"):
+
+                    # Editor Header
+                    with ui.element("div").classes("b-panel-head"):
+                        with ui.element("div").classes("b-panel-title"):
+                            ui.html('<div class="b-panel-dot"><span></span><span></span><span></span></div>')
+                            ui.label("Code Editor")
+                        current_file_label = ui.html('<span class="b-current-file">index.html</span>')
+
+                    # Editor Body
+                    with ui.element("div").classes("b-editor-body"):
+                        editor = ui.textarea().classes("w-full h-full")
+
+                    # AI Prompt Bar
+                    with ui.element("div").classes("b-prompt-bar"):
+                        with ui.element("div").classes("b-prompt-label"):
+                            ui.html('<span class="b-prompt-badge">✨ AI</span>')
+                            ui.label("Describe your website or changes")
+
+                        builder_prompt = ui.textarea(
+                            placeholder="e.g. Create a premium responsive landing page for a beauty parlour with hero, services, gallery, and contact sections..."
+                        ).classes("b-prompt-input")
+
+                        generate_button = ui.button(
+                            "✨  Generate",
+                            on_click=generate_project,
+                        ).props("unelevated no-caps").classes("b-generate-btn")
+
+                # RIGHT: Preview
+                with ui.column().classes("b-preview-col gap-0"):
+                    with ui.element("div").classes("b-panel-head"):
+                        with ui.element("div").classes("b-panel-title"):
+                            ui.html('<div class="b-panel-dot"><span></span><span></span><span></span></div>')
+                            ui.label("Live Preview")
+                        ui.html('<span class="b-current-file">localhost / preview</span>')
+
+                    with ui.element("div").classes("b-preview-body"):
+                        preview = ui.html().classes("w-full h-full")
+
+    # Initial load
+    select_file("index.html")
+    update_preview()

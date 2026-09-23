@@ -4,6 +4,7 @@ from app.builder import (
     _parse_generated_files,
     _project_document,
     _project_title,
+    _wants_react,
 )
 import io
 import zipfile
@@ -73,6 +74,12 @@ h1 { color: hotpink; }
 def test_project_title_comes_from_prompt():
     assert _project_title("Build a premium beauty parlour website") == "Build A Premium Beauty Parlour Website"
     assert _project_title("   ") == "Website Project"
+
+
+def test_react_prompt_is_detected():
+    assert _wants_react("Build a React beauty parlour website")
+    assert _wants_react("Create a React.js dashboard")
+    assert not _wants_react("Build a plain HTML landing page")
 
 
 def test_project_zip_contains_all_files():

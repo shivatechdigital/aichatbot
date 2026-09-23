@@ -222,7 +222,21 @@ body{background:var(--bg-main);color:var(--text-main);font-family:var(--sans);ov
           display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .toast-tit{font-weight:600;font-size:13px;color:var(--text-main)}.toast-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
 
-@media(max-width:900px){.a-sb{width:200px}.a-chat{width:340px}.home-title{font-size:32px}}
+@media(max-width:900px){
+    .a-sb{width:200px}.a-chat{width:340px}.home-title{font-size:32px}
+    .prev-toolbar{flex-wrap:wrap;height:auto;min-height:56px;padding:8px}
+    .url-bar{min-width:160px}.a-chat{width:36vw;min-width:260px}
+}
+@media(max-width:680px){
+    body{overflow:auto}.a-root{height:auto;min-height:100vh;flex-direction:column;overflow:visible}
+    .a-sb{width:100%;height:auto;max-height:220px;border-right:0;border-bottom:1px solid var(--border)}
+    .a-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.a-recent{max-height:90px}
+    .a-main{min-height:calc(100vh - 220px)}.a-topbar{padding:0 16px}.a-topbar .top-link{display:none}
+    .a-arena{flex-direction:column;overflow:visible}.a-chat{width:100%;height:310px;border-right:0;border-bottom:1px solid var(--border)}
+    .a-prev{height:calc(100vh - 310px);min-height:520px}.prev-tabs{padding-left:8px}.prev-tab{padding:10px 12px}
+    .prev-toolbar{gap:5px}.prev-toolbar .w-40{width:115px!important}.pub-btn{padding:0 8px!important}
+    .prompt-box{padding:16px}.prompt-tools{align-items:flex-end}.tool-grp{flex-wrap:wrap}
+}
 </style>
 """
 
@@ -237,7 +251,7 @@ def _combine_document(files: dict[str, str]) -> str:
     react = files.get("src/App.jsx") or files.get("src/App.js")
     if react:
         css = files.get("src/styles.css", "") + files.get("src/App.css", "")
-        react = re.sub(r"^\s*import\s+.*?;\s*$", "", react, flags=re.M)
+        react = re.sub(r"^\s*import\s+.*?;?\s*$", "", react, flags=re.M)
         react = re.sub(r"\bexport\s+default\s+", "", react)
         return (
             "<!doctype html><html><head><meta charset=UTF-8><meta name=viewport content='width=device-width,initial-scale=1'>"
@@ -285,6 +299,10 @@ def _parse_files(raw: str) -> dict[str, str]:
 def _title_from_prompt(prompt: str) -> str:
     words = re.findall(r"[A-Za-z0-9]+", prompt)
     return (" ".join(words[:6]).strip().title()) or "Website Project"
+
+
+def _wants_react(prompt: str) -> bool:
+    return bool(re.search(r"\breact(?:\.js)?\b", prompt, re.I))
 
 
 def _make_zip(files: dict[str, str]) -> bytes:
@@ -341,7 +359,10 @@ def published_page(slug: str):
     files = {r["path"]: r["content"] for r in rows}
     doc = html_mod.escape(_combine_document(files), quote=True)
     ui.add_head_html("<style>html,body,#q-app{margin:0;width:100%;height:100%;overflow:hidden}</style>")
-    ui.html(f'<iframe style="border:0;width:100%;height:100vh" srcdoc="{doc}"></iframe>')
+    ui.html(
+        f'<iframe sandbox="allow-scripts" '
+        f'style="border:0;width:100%;height:100vh" srcdoc="{doc}"></iframe>'
+    )
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -507,13 +528,25 @@ def builder_page():
                 st["code_B"] = fb
             return True
 
+        wants_react = _wants_react(st["prompt"])
+        if wants_react:
+            contract = (
+                "Build a real React website. Return ONLY these file blocks, no explanation:\n\n"
+                "### FILE: package.json\n```json\n{\"dependencies\":{\"react\":\"^18.0.0\"}}\n```\n\n"
+                "### FILE: src/App.jsx\n```jsx\n<complete React component named App>\n```\n\n"
+                "### FILE: src/styles.css\n```css\n<complete CSS>\n```\n\n"
+                "App.jsx must define `function App()`, use JSX, and must not import local files."
+            )
+        else:
+            contract = (
+                "Build a high-quality single-page website. Return ONLY these file blocks, no explanation:\n\n"
+                "### FILE: index.html\n```html\n<complete HTML>\n```\n\n"
+                "### FILE: style.css\n```css\n<complete CSS>\n```\n\n"
+                "### FILE: script.js\n```javascript\n<JS code>\n```"
+            )
         instr = (
-            "You are a Senior Web Developer. Create a high-quality, production-ready single-page website.\n"
-            f"Design style: {style}\n"
-            "Return ONLY these three code blocks in this exact format, no other text:\n\n"
-            "### FILE: index.html\n```html\n<complete HTML>\n```\n\n"
-            "### FILE: style.css\n```css\n<complete CSS>\n```\n\n"
-            "### FILE: script.js\n```javascript\n<JS code>\n```\n\n"
+            "You are a Senior Web Developer. Create a production-ready responsive website.\n"
+            f"Design style: {style}\n{contract}\n\n"
             f"User request:\n{st['prompt']}"
         )
         raw = ""
@@ -522,7 +555,10 @@ def builder_page():
                 raw += chunk
             files = _parse_files(raw)
             if not files or "index.html" not in files:
-                raise ValueError("No HTML generated")
+                raise ValueError(
+                    "AI did not return the required React files"
+                    if wants_react else "No HTML generated"
+                )
             if name == "A":
                 st["code_A"] = files
             else:

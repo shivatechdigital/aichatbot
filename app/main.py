@@ -298,6 +298,71 @@ body {
     max-width: 75%;
 }
 
+.user-message-group {
+    max-width: 78%;
+    margin-left: auto;
+    gap: 7px !important;
+    align-items: flex-end !important;
+}
+
+.sent-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px !important;
+}
+
+.sent-file-card {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 210px;
+    min-height: 58px;
+    padding: 8px 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: white;
+}
+
+.sent-file-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #f0efec;
+    color: #222;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.sent-file-name {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sent-image-preview {
+    width: 112px !important;
+    height: 88px !important;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.sent-image-preview img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
 .message-ai {
     max-width: 85%;
     line-height: 1.65;
@@ -523,6 +588,7 @@ def add_chat_to_sidebar(title: str):
 
 def render_messages():
     messages_container.clear()
+    last_assistant_element = None
 
     if not current_messages:
         with messages_container:
@@ -553,12 +619,31 @@ def render_messages():
                             suggestion,
                             on_click=lambda s=suggestion: use_suggestion(s),
                         ).props("outline").classes("normal-case text-left")
-        return
+        return None
 
     with messages_container:
         for msg in current_messages:
             if msg["role"] == "user":
-                with ui.row().classes("w-full justify-end"):
+                with ui.column().classes("user-message-group"):
+                    attachments = msg.get("attachments", [])
+                    if attachments:
+                        with ui.row().classes("sent-attachments"):
+                            for attachment in attachments:
+                                if attachment["kind"] == "image":
+                                    ui.image(attachment["data_url"]).classes(
+                                        "sent-image-preview"
+                                    )
+                                else:
+                                    with ui.row().classes("sent-file-card no-wrap"):
+                                        extension = (
+                                            Path(attachment["name"])
+                                            .suffix.lstrip(".")[:4]
+                                            or "file"
+                                        )
+                                        ui.label(extension).classes("sent-file-icon")
+                                        ui.label(attachment["name"]).classes(
+                                            "sent-file-name"
+                                        )
                     ui.label(msg["content"]).classes("message-user")
             else:
                 with ui.row().classes("w-full gap-3"):
@@ -568,9 +653,12 @@ def render_messages():
                     )
                     # Quasar's HTML rendering is useful for displaying
                     # formatted model output. Content is escaped first.
-                    ui.html(format_ai_html(msg["content"])).classes(
+                    last_assistant_element = ui.html(
+                        format_ai_html(msg["content"])
+                    ).classes(
                         "message-ai"
                     )
+    return last_assistant_element
 
 
 def format_ai_html(text: str) -> str:
@@ -736,35 +824,50 @@ def load_chat(chat):
 # LLM
 # ============================================================
 
-async def call_llm(messages):
+async def stream_llm(messages):
     payload = {
         "messages": messages,
         "temperature": 0.2,
-        "stream": False,
+        "stream": True,
     }
     if LLM_MODEL.lower() != "auto":
         payload["model"] = LLM_MODEL
 
     async with httpx.AsyncClient(timeout=180) as client:
-        response = await client.post(
-            LLM_URL,
-            json=payload,
-        )
+        async with client.stream("POST", LLM_URL, json=payload) as response:
+            if response.is_error:
+                details = (await response.aread()).decode(errors="replace")[:1000]
+                raise RuntimeError(
+                    f"LLM API returned {response.status_code}: {details}"
+                )
 
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as error:
-            details = response.text.strip()[:1000]
-            raise RuntimeError(
-                f"LLM API returned {response.status_code}: {details or error}"
-            ) from error
-        data = response.json()
+            if "application/json" in response.headers.get("content-type", ""):
+                data = json.loads(await response.aread())
+                content = (
+                    data.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                )
+                if content:
+                    yield content
+                return
 
-    return (
-        data.get("choices", [{}])[0]
-        .get("message", {})
-        .get("content", "")
-    )
+            async for line in response.aiter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                data_text = line.removeprefix("data:").strip()
+                if data_text == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_text)
+                    choice = data["choices"][0]
+                    content = choice.get("delta", {}).get("content")
+                    if content is None:
+                        content = choice.get("message", {}).get("content")
+                except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+                    continue
+                if content:
+                    yield content
 
 
 async def send_message():
@@ -809,21 +912,31 @@ async def send_message():
     )
     api_message_content = api_content if has_images else prompt_text
 
-    display_text = text
-    if attachments:
-        display_text += "\n\nAttached: " + ", ".join(
-            attachment["name"] for attachment in attachments
-        )
+    display_attachments = [
+        {
+            "name": attachment["name"],
+            "kind": attachment["kind"],
+            **(
+                {"data_url": attachment["data_url"]}
+                if attachment["kind"] == "image"
+                else {}
+            ),
+        }
+        for attachment in attachments
+    ]
 
     current_messages.append(
         {
             "role": "user",
-            "content": display_text,
+            "content": text,
             "api_content": api_message_content,
+            "attachments": display_attachments,
         }
     )
 
-    render_messages()
+    assistant_message = {"role": "assistant", "content": ""}
+    current_messages.append(assistant_message)
+    assistant_element = render_messages()
 
     send_button.disable()
 
@@ -833,35 +946,31 @@ async def send_message():
                 "role": message["role"],
                 "content": message.get("api_content", message["content"]),
             }
-            for message in current_messages
+            for message in current_messages[:-1]
         ]
-        answer = await call_llm(api_messages)
+        async for chunk in stream_llm(api_messages):
+            assistant_message["content"] += chunk
+            assistant_element.set_content(
+                format_ai_html(assistant_message["content"])
+            )
+            await asyncio.sleep(0)
 
-        if not answer:
-            answer = "The model returned an empty response."
-
-        current_messages.append(
-            {
-                "role": "assistant",
-                "content": answer,
-            }
-        )
+        if not assistant_message["content"]:
+            assistant_message["content"] = "The model returned an empty response."
+            assistant_element.set_content(
+                format_ai_html(assistant_message["content"])
+            )
 
     except Exception as e:
-        current_messages.append(
-            {
-                "role": "assistant",
-                "content": (
-                    "⚠️ **LLM connection error**\n\n"
-                    f"`{str(e)}`\n\n"
-                    f"Endpoint: `{LLM_URL}`"
-                ),
-            }
+        assistant_message["content"] = (
+            "⚠️ **LLM connection error**\n\n"
+            f"`{str(e)}`\n\n"
+            f"Endpoint: `{LLM_URL}`"
         )
+        assistant_element.set_content(format_ai_html(assistant_message["content"]))
 
     finally:
         send_button.enable()
-        render_messages()
 
 
 # ============================================================

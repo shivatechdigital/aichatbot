@@ -716,7 +716,9 @@ def builder_page() -> None:
             else:
                 item.classes(remove="active")
         if current_file_label:
-            current_file_label.set_text(state["path"])
+                current_file_label.set_content(
+                    f'<span class="b-current-file">{html.escape(state["path"])}</span>'
+                )
 
     def select_file(path: str):
         state["path"] = path

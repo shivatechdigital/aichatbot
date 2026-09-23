@@ -1,19 +1,23 @@
-"""Website Builder workspace - Production Level UI."""
+"""Design Arena - Production Level UI for AI Website Generation Battle."""
 
 import html
 import importlib.util
 import io
 import pkgutil
 import re
+import asyncio
 import zipfile
 
 if not hasattr(pkgutil, "find_loader"):
     pkgutil.find_loader = lambda name: importlib.util.find_spec(name)
 
 from nicegui import ui
-
 from app.database import db
 
+
+# ============================================================
+# DEFAULTS
+# ============================================================
 
 DEFAULT_FILES = {
     "index.html": """<!doctype html>
@@ -26,40 +30,864 @@ DEFAULT_FILES = {
   </head>
   <body>
     <main class="hero">
-      <p class="eyebrow">Your new project</p>
       <h1>Start designing here.</h1>
-      <p>Edit the files on the left and preview the result instantly.</p>
+      <p>Enter a prompt to generate your website.</p>
     </main>
     <script src="script.js"></script>
   </body>
 </html>
 """,
-    "style.css": """* { box-sizing: border-box; }
-body { margin: 0; font-family: Arial, sans-serif; color: #222; }
-.hero { min-height: 100vh; display: grid; place-content: center; padding: 32px; background: #f5efe8; }
-.eyebrow { color: #9b5d45; text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
-h1 { max-width: 620px; margin: 8px 0; font-size: clamp(42px, 8vw, 88px); line-height: .95; }
-.hero p:last-child { color: #6d625a; font-size: 18px; }
+    "style.css": """body { margin: 0; font-family: Arial, sans-serif; }
+.hero { min-height: 100vh; display: grid; place-content: center; padding: 32px; background: #f5efe8; text-align: center; }
+h1 { font-size: 48px; margin: 0 0 12px 0; }
+p { color: #6d625a; }
 """,
-    "script.js": """// Add small interactions here when your design needs them.
-""",
+    "script.js": "// JavaScript goes here\n",
 }
 
-FILE_ICONS = {
-    "index.html": ("HTML", "#e34c26"),
-    "style.css": ("CSS", "#2965f1"),
-    "script.js": ("JS", "#f7df1e"),
-    "package.json": ("JSON", "#8b5cf6"),
-    "src/App.jsx": ("JSX", "#61dafb"),
-    "src/App.js": ("JS", "#f7df1e"),
-    "src/styles.css": ("CSS", "#2965f1"),
-    "src/App.css": ("CSS", "#2965f1"),
+
+# ============================================================
+# CSS STYLES
+# ============================================================
+
+ARENA_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+:root {
+    --bg-main: #fcfcfb;
+    --bg-sidebar: #f5f4f1;
+    --bg-panel: #ffffff;
+    --border-color: #e6e4df;
+    --text-main: #2d2d2d;
+    --text-muted: #76746f;
+    --accent-teal: #a5c3b8;
+    --accent-teal-hover: #8eb1a4;
+    --accent-teal-dark: #6b9485;
+    --brand-text: #1a1a1a;
+    --font-sans: 'Inter', sans-serif;
+    --font-serif: 'Playfair Display', serif;
 }
 
-PROJECT_FILES = list(FILE_ICONS)
+* { box-sizing: border-box; }
 
+body, html {
+    margin: 0; padding: 0; height: 100vh; width: 100vw;
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    overflow: hidden;
+}
+
+.nicegui-content {
+    padding: 0 !important;
+    max-width: none !important;
+    height: 100vh !important;
+    width: 100vw !important;
+}
+
+.q-page-container { padding: 0 !important; }
+
+/* =========== LAYOUT =========== */
+.arena-root {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    gap: 0 !important;
+}
+
+/* =========== SIDEBAR =========== */
+.a-sidebar {
+    width: 240px;
+    height: 100%;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 0 !important;
+}
+
+.a-sidebar-header {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    flex-shrink: 0;
+}
+
+.a-logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, #d4d0c4, #a5c3b8);
+    display: flex; align-items: center; justify-content: center;
+    color: #333; font-size: 16px; font-weight: 700;
+}
+
+.a-nav {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.a-nav-btn {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding: 10px 12px !important;
+    color: var(--text-main) !important;
+    font-weight: 500 !important;
+    font-size: 13.5px !important;
+    border-radius: 8px !important;
+    text-transform: none !important;
+    min-height: 38px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.a-nav-btn:hover { background: #eae8e3 !important; }
+
+.a-nav-btn .q-btn__content {
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+}
+
+.a-nav-btn .q-icon {
+    color: #555 !important;
+    font-size: 18px !important;
+}
+
+.a-recent {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 10px;
+    min-height: 0;
+}
+
+.a-recent::-webkit-scrollbar { width: 6px; }
+.a-recent::-webkit-scrollbar-thumb { background: #d0cec9; border-radius: 3px; }
+
+.a-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 12px 10px;
+}
+
+.a-recent-item {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 7px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.a-recent-item:hover {
+    background: #eae8e3;
+    color: var(--text-main);
+}
+
+.a-recent-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #a5c3b8; flex-shrink: 0;
+}
+
+.a-recent-dot.gray { background: #b8b6b0; }
+
+.a-user {
+    padding: 14px 16px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.a-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #4f46e5; color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px;
+}
+
+/* =========== MAIN AREA =========== */
+.a-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+    gap: 0 !important;
+}
+
+.a-topnav {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    flex-shrink: 0;
+    border-bottom: 1px solid transparent;
+}
+
+.a-brand-title {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--brand-text);
+}
+
+.a-brand-sub {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 6px;
+}
+
+.a-top-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.a-top-link {
+    color: var(--text-main) !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-height: auto !important;
+}
+
+/* =========== HOME SCREEN =========== */
+.a-home {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px 12vh;
+    gap: 0 !important;
+}
+
+.a-hero-title {
+    font-family: var(--font-serif);
+    font-size: 46px;
+    font-weight: 400;
+    margin: 0 0 12px 0;
+    color: var(--brand-text);
+    text-align: center;
+}
+
+.a-hero-sub {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 36px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.a-hero-sub-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.a-prompt-box {
+    width: 100%;
+    max-width: 820px;
+    background: white;
+    border: 2px solid #c0d3cc;
+    border-radius: 18px;
+    padding: 20px 22px 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.03);
+    transition: all 0.2s;
+}
+
+.a-prompt-box:focus-within {
+    border-color: var(--accent-teal-dark);
+    box-shadow: 0 8px 30px rgba(107, 148, 133, 0.15);
+}
+
+.a-prompt-input .q-field__control {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    min-height: 140px !important;
+}
+
+.a-prompt-input .q-field__control:before,
+.a-prompt-input .q-field__control:after { display: none !important; }
+
+.a-prompt-input textarea {
+    padding: 0 !important;
+    font-size: 15.5px !important;
+    line-height: 1.55 !important;
+    color: var(--text-main) !important;
+    font-family: var(--font-sans) !important;
+    resize: none !important;
+    min-height: 130px !important;
+    border: 0 !important;
+    outline: none !important;
+    background: transparent !important;
+}
+
+.a-prompt-input textarea::placeholder {
+    color: #a8a6a1 !important;
+}
+
+.a-prompt-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    gap: 8px;
+}
+
+.a-tool-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.a-tool-icon-btn {
+    background: transparent !important;
+    color: #666 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 50% !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    padding: 0 !important;
+}
+
+.a-tool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--text-main);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+}
+
+.a-tool-chip:hover { background: #f9f8f5; }
+
+.a-tool-chip-active {
+    color: var(--accent-teal-dark);
+    border-color: transparent;
+    background: transparent;
+    font-weight: 600;
+}
+
+.a-send-btn {
+    background: var(--accent-teal) !important;
+    color: white !important;
+    border-radius: 50% !important;
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    box-shadow: 0 4px 12px rgba(165, 195, 184, 0.4) !important;
+    transition: all 0.2s !important;
+}
+
+.a-send-btn:hover {
+    background: var(--accent-teal-hover) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(165, 195, 184, 0.5) !important;
+}
+
+/* =========== ARENA SCREEN =========== */
+.a-arena {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+    gap: 0 !important;
+}
+
+.a-chat-panel {
+    width: 400px;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-main);
+    flex-shrink: 0;
+    gap: 0 !important;
+}
+
+.a-play-banner {
+    height: 48px;
+    background: #f0f5f2;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--accent-teal-dark);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.a-chat-history {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 0;
+}
+
+.a-chat-history::-webkit-scrollbar { width: 6px; }
+.a-chat-history::-webkit-scrollbar-thumb { background: #d0cec9; border-radius: 3px; }
+
+.a-msg-user {
+    background: #f0efec;
+    padding: 14px 16px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-main);
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.a-msg-card {
+    background: white;
+    border: 1px solid #d5e1dc;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+}
+
+.a-option-tabs {
+    display: flex;
+    background: #f5f4f1;
+    border-radius: 22px;
+    padding: 4px;
+    margin-bottom: 14px;
+}
+
+.a-opt-tab {
+    flex: 1;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.a-opt-tab.active {
+    background: white;
+    color: var(--text-main);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    font-weight: 600;
+}
+
+.a-artifact-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    color: var(--accent-teal-dark);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.a-artifact-timer {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.a-agent-status-line {
+    color: var(--text-muted);
+    font-size: 12.5px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.a-using-tool {
+    padding: 10px 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.a-chat-input-wrap {
+    padding: 14px;
+    border-top: 1px solid var(--border-color);
+    background: white;
+    flex-shrink: 0;
+}
+
+.a-chat-input-box {
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 10px 12px;
+    background: white;
+}
+
+.a-chat-input-box textarea {
+    border: 0 !important;
+    outline: none !important;
+    resize: none !important;
+    width: 100% !important;
+    min-height: 32px !important;
+    font-size: 13.5px !important;
+    color: var(--text-main) !important;
+    background: transparent !important;
+    padding: 4px 0 !important;
+    font-family: var(--font-sans) !important;
+}
+
+.a-chat-input-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+}
+
+/* =========== PREVIEW PANEL =========== */
+.a-preview-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-main);
+    min-width: 0;
+    gap: 0 !important;
+}
+
+.a-preview-tabs {
+    display: flex;
+    background: var(--bg-sidebar);
+    padding: 8px 20px 0;
+    gap: 4px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.a-preview-tab {
+    padding: 12px 20px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 10px 10px 0 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all 0.2s;
+    user-select: none;
+    margin-bottom: -1px;
+}
+
+.a-preview-tab.active {
+    color: var(--brand-text);
+    background: white;
+    border-color: var(--border-color);
+}
+
+.a-preview-tab-icon {
+    font-size: 16px;
+    color: #b8b6b0;
+}
+
+.a-preview-tab.active .a-preview-tab-icon {
+    color: var(--accent-teal-dark);
+}
+
+.a-preview-toolbar {
+    height: 56px;
+    background: white;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.a-mode-toggle {
+    display: flex;
+    background: #f5f4f1;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.a-mode-btn {
+    width: 36px !important;
+    height: 30px !important;
+    min-width: 36px !important;
+    min-height: 30px !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--text-muted) !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+}
+
+.a-mode-btn.active {
+    background: white !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+}
+
+.a-url-bar {
+    flex: 1;
+    background: #f5f4f1;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+}
+
+.a-url-bar .material-icons {
+    font-size: 16px;
+    color: #b8b6b0;
+}
+
+.a-toolbar-btn {
+    background: transparent !important;
+    color: var(--text-muted) !important;
+    border: none !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    border-radius: 6px !important;
+}
+
+.a-toolbar-btn:hover { background: #f5f4f1 !important; }
+
+.a-publish-btn {
+    background: white !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 7px !important;
+    padding: 0 14px !important;
+    min-height: 34px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    box-shadow: none !important;
+}
+
+.a-publish-btn:hover { background: #f5f4f1 !important; }
+
+.a-publish-btn.ready {
+    background: var(--accent-teal) !important;
+    color: white !important;
+    border-color: var(--accent-teal) !important;
+}
+
+.a-preview-body {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: white;
+    min-height: 0;
+}
+
+.a-preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+.a-code-view {
+    width: 100%;
+    height: 100%;
+    background: #1e1e2e;
+    overflow: auto;
+    padding: 0;
+    display: none;
+}
+
+.a-code-view.visible { display: block; }
+.a-preview-iframe-wrap.hidden { display: none; }
+
+.a-code-view pre {
+    margin: 0;
+    padding: 20px 24px;
+    color: #cdd6f4;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.a-code-view .code-file-label {
+    background: #313244;
+    color: #a6e3a1;
+    padding: 8px 24px;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    border-top: 1px solid #45475a;
+    border-bottom: 1px solid #45475a;
+    margin-top: 12px;
+}
+
+.a-code-view .code-file-label:first-child { margin-top: 0; border-top: none; }
+
+/* Loading Overlay */
+.a-loading {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-main);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    gap: 0;
+}
+
+.a-globe {
+    width: 100px;
+    height: 100px;
+    background: #eef4f1;
+    border-radius: 50%;
+    border: 2px solid var(--accent-teal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.a-globe .material-icons {
+    font-size: 48px;
+    color: var(--accent-teal-dark);
+}
+
+.a-load-title {
+    font-family: var(--font-serif);
+    font-size: 28px;
+    color: var(--brand-text);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.a-load-sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.a-dots {
+    display: flex;
+    gap: 8px;
+}
+
+.a-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #c0d3cc;
+    animation: a-bounce 1.4s infinite ease-in-out both;
+}
+
+.a-dot:nth-child(1) { animation-delay: -0.32s; }
+.a-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes a-bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; background: var(--accent-teal-dark); }
+}
+
+/* Toast Notification */
+.a-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    z-index: 1000;
+    max-width: 320px;
+}
+
+.a-toast-check {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: #d1e7d0; color: #2d6f2d;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+.a-toast-title { font-weight: 600; font-size: 13px; color: var(--text-main); }
+.a-toast-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .a-sidebar { width: 200px; }
+    .a-chat-panel { width: 340px; }
+    .a-hero-title { font-size: 32px; }
+}
+</style>
+"""
+
+
+# ============================================================
+# HELPERS
+# ============================================================
 
 def _project_document(files: dict[str, str]) -> str:
+    """Combine HTML, CSS, JS into a single self-contained doc."""
     react_code = files.get("src/App.jsx") or files.get("src/App.js")
     if react_code:
         css = files.get("src/styles.css", "") + files.get("src/App.css", "")
@@ -71,15 +899,11 @@ def _project_document(files: dict[str, str]) -> str:
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>{css}</style></head><body><div id="root"></div>
-<script type="text/babel">
-window.addEventListener('error', function(event) {{
-    document.body.innerHTML = '<pre style="padding:24px;color:#b91c1c;white-space:pre-wrap;font:14px monospace">Preview error: ' + event.message + '</pre>';
-}});
-{react_code}
+<script type="text/babel">{react_code}
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
 </script></body></html>"""
-    index = files.get("index.html", DEFAULT_FILES["index.html"])
+    index = files.get("index.html", "<h1>Waiting for content...</h1>")
     css = files.get("style.css", "")
     js = files.get("script.js", "")
     index = re.sub(
@@ -98,26 +922,19 @@ root.render(<App />);
 
 
 def _parse_generated_files(response: str) -> dict[str, str]:
-    files = {}
-    header_pattern = re.compile(
-        r"###\s*FILE:\s*([^\n]+)\n(.*?)(?=###\s*FILE:|\Z)",
+    """Extract file blocks from LLM response."""
+    pattern = re.compile(
+        r"###\s*FILE:\s*([^\n]+)\n```[^\n]*\n(.*?)```",
         re.IGNORECASE | re.DOTALL,
     )
-    for path, block in header_pattern.findall(response):
+    files = {}
+    for path, content in pattern.findall(response):
         normalized = path.strip().replace("\\", "/")
-        if normalized not in FILE_ICONS and normalized != "package.json":
-            continue
-        fenced = re.search(r"```[^\n]*\n(.*?)```", block, re.DOTALL)
-        files[normalized] = (fenced.group(1) if fenced else block).strip() + "\n"
-
-    if files:
-        return files
-
-    fallback_paths = ["index.html", "style.css", "script.js"]
-    fenced_pattern = re.compile(r"```(html|css|javascript|js|jsx|json)\s*\n(.*?)```", re.IGNORECASE | re.DOTALL)
-    for language, content in fenced_pattern.findall(response):
-        path = {"html": "index.html", "css": "style.css", "javascript": "script.js", "js": "script.js", "jsx": "src/App.jsx", "json": "package.json"}[language.lower()]
-        files[path] = content.strip() + "\n"
+        if normalized in {
+            "index.html", "style.css", "script.js", "package.json",
+            "src/App.jsx", "src/App.js", "src/styles.css", "src/App.css",
+        }:
+            files[normalized] = content.strip() + "\n"
     return files
 
 
@@ -156,963 +973,454 @@ def published_page(slug: str) -> None:
     )
 
 
-BUILDER_CSS = """
-<style>
-/* ============ BUILDER GLOBAL ============ */
-.builder-root {
-    height: 100vh;
-    background: #0a0a0f;
-    color: #e8e8ed;
-    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
-    overflow: hidden;
-}
-
-.builder-root * {
-    box-sizing: border-box;
-}
-
-/* ============ SIDEBAR ============ */
-.b-sidebar {
-    width: 30% !important;
-    min-width: 320px;
-    max-width: 400px;
-    height: 100vh;
-    padding: 0 !important;
-    background: #0f0f16;
-    border-right: 1px solid #1e1e2a;
-    display: flex;
-    flex-direction: column;
-    gap: 0 !important;
-    flex-shrink: 0;
-}
-
-.b-sidebar-header {
-    padding: 18px 20px;
-    border-bottom: 1px solid #1e1e2a;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.b-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.b-brand-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #8b5cf6, #6366f1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 16px;
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-}
-
-.b-brand-text {
-    color: #fff;
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: -0.2px;
-}
-
-.b-back-btn {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-    min-height: 32px !important;
-    color: #8b8b98 !important;
-    background: transparent !important;
-    border-radius: 8px !important;
-}
-.b-back-btn:hover {
-    color: #fff !important;
-    background: #1e1e2a !important;
-}
-
-.b-section {
-    padding: 18px 20px 12px;
-}
-
-.b-sidebar-scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    padding-bottom: 18px;
-}
-
-.b-section-label {
-    color: #6b6b7e;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 10px;
-}
-
-/* Select styling */
-.b-select .q-field__control {
-    background: #16161f !important;
-    border: 1px solid #24243a !important;
-    border-radius: 10px !important;
-    color: #e8e8ed !important;
-    min-height: 42px !important;
-    padding: 0 12px !important;
-}
-.b-select .q-field__control:hover {
-    border-color: #33334f !important;
-}
-.b-select .q-field__control:before,
-.b-select .q-field__control:after {
-    display: none !important;
-}
-.b-select .q-field__native,
-.b-select .q-field__input {
-    color: #e8e8ed !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-}
-.b-select .q-icon {
-    color: #8b8b98 !important;
-}
-
-/* New Project Button */
-.b-new-btn {
-    width: 100%;
-    margin-top: 10px !important;
-    background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
-    color: white !important;
-    border-radius: 10px !important;
-    min-height: 42px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.2px !important;
-    text-transform: none !important;
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
-    transition: all 0.2s ease !important;
-}
-.b-new-btn:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45) !important;
-}
-
-/* File List */
-.b-file-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 0 12px;
-}
-
-.b-file-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    color: #b8b8c8;
-    font-size: 13px;
-    border: 1px solid transparent;
-}
-
-.b-file-item:hover {
-    background: #16161f;
-    color: #fff;
-}
-
-.b-file-item.active {
-    background: #1a1a2e;
-    color: #fff;
-    border-color: #33335a;
-}
-
-.b-file-tag {
-    width: 30px;
-    height: 22px;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    font-weight: 800;
-    color: white;
-    flex-shrink: 0;
-}
-
-/* Save button */
-.b-save-btn {
-    width: 100%;
-    background: #16161f !important;
-    color: #e8e8ed !important;
-    border: 1px solid #24243a !important;
-    border-radius: 10px !important;
-    min-height: 40px !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    text-transform: none !important;
-    letter-spacing: 0.2px !important;
-    margin-top: 12px !important;
-    transition: all 0.2s ease !important;
-}
-.b-save-btn:hover {
-    background: #1e1e2a !important;
-    border-color: #33335a !important;
-}
-
-.b-sidebar-footer {
-    margin-top: auto;
-    padding: 16px 20px;
-    border-top: 1px solid #1e1e2a;
-}
-
-.b-footer-info {
-    color: #5b5b6e;
-    font-size: 11px;
-    line-height: 1.5;
-}
-
-/* ============ MAIN AREA ============ */
-.b-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: #0a0a0f;
-    overflow: hidden;
-}
-
-.b-toolbar {
-    height: 62px;
-    flex-shrink: 0;
-    padding: 0 24px;
-    background: #0f0f16;
-    border-bottom: 1px solid #1e1e2a;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.b-toggle-group {
-    display: flex;
-    gap: 4px;
-    padding: 4px;
-    border: 1px solid #24243a;
-    border-radius: 10px;
-    background: #16161f;
-}
-
-.b-toggle-btn {
-    min-height: 32px !important;
-    padding: 0 18px !important;
-    border-radius: 7px !important;
-    background: transparent !important;
-    color: #8b8b98 !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    text-transform: none !important;
-    box-shadow: none !important;
-}
-
-.b-toggle-btn.active {
-    background: #2a2942 !important;
-    color: white !important;
-}
-
-.b-toolbar-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.b-toolbar-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    background: linear-gradient(135deg, #f97316, #ec4899);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 16px;
-}
-
-.b-toolbar-heading {
-    color: #fff;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-}
-
-.b-toolbar-sub {
-    color: #6b6b7e;
-    font-size: 12px;
-    margin-top: 2px;
-}
-
-.b-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    background: #16161f;
-    border: 1px solid #24243a;
-    border-radius: 20px;
-    color: #a8a8b8;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.b-status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #10b981;
-    box-shadow: 0 0 8px #10b98188;
-}
-
-/* ============ WORKSPACE ============ */
-.b-workspace {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    gap: 0;
-    overflow: hidden;
-}
-
-.b-view-container {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    min-width: 0;
-    overflow: hidden;
-    padding: 18px;
-}
-
-.b-editor-col {
-    flex: 1 1 50%;
-    min-width: 0;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: #0a0a0f;
-    border-right: 1px solid #1e1e2a;
-    overflow: hidden;
-}
-
-.b-preview-col {
-    flex: 1 1 50%;
-    min-width: 0;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: #0a0a0f;
-    overflow: hidden;
-}
-
-.b-editor-wrap,
-.b-preview-wrap {
-    flex: 1 1 auto;
-    width: 100% !important;
-    min-width: 0;
-    min-height: 0;
-    height: 100%;
-    overflow: hidden;
-}
-
-/* Panel headers */
-.b-panel-head {
-    height: 44px;
-    flex-shrink: 0;
-    padding: 0 18px;
-    background: #0f0f16;
-    border-bottom: 1px solid #1e1e2a;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.b-panel-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #b8b8c8;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-}
-
-.b-panel-dot {
-    display: inline-flex;
-    gap: 5px;
-}
-.b-panel-dot span {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #33334f;
-}
-.b-panel-dot span:nth-child(1) { background: #ff5f57; }
-.b-panel-dot span:nth-child(2) { background: #febc2e; }
-.b-panel-dot span:nth-child(3) { background: #28c840; }
-
-.b-current-file {
-    color: #6b6b7e;
-    font-size: 12px;
-    font-family: 'JetBrains Mono', Consolas, monospace;
-}
-
-/* Editor */
-.b-editor-body {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    min-width: 0;
-    padding: 0 !important;
-    display: flex;
-    overflow: hidden;
-    background: #0d0d15;
-}
-
-.b-editor-body .q-field {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-}
-
-.b-editor-body .q-field__control {
-    background: transparent !important;
-    padding: 0 !important;
-    border: 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    box-shadow: none !important;
-}
-
-.b-editor-body .q-field__control:before,
-.b-editor-body .q-field__control:after {
-    display: none !important;
-}
-
-.b-editor-body .q-field__label {
-    display: none !important;
-}
-
-.b-editor-body textarea {
-    width: 100% !important;
-    height: 100% !important;
-    min-width: 0 !important;
-    padding: 18px 22px !important;
-    background: #0d0d15 !important;
-    color: #e8e8ed !important;
-    font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace !important;
-    font-size: 13px !important;
-    line-height: 1.7 !important;
-    border: 0 !important;
-    outline: none !important;
-    resize: none !important;
-    white-space: pre !important;
-    overflow-x: auto !important;
-    overflow-y: auto !important;
-    overflow-wrap: normal !important;
-    word-break: normal !important;
-    caret-color: #8b5cf6;
-}
-
-.b-editor-body textarea::-webkit-scrollbar { width: 10px; height: 10px; }
-.b-editor-body textarea::-webkit-scrollbar-track { background: #0d0d15; }
-.b-editor-body textarea::-webkit-scrollbar-thumb {
-    background: #24243a;
-    border-radius: 5px;
-    border: 2px solid #0d0d15;
-}
-.b-editor-body textarea::-webkit-scrollbar-thumb:hover { background: #33335a; }
-
-/* AI Prompt Bar */
-.b-prompt-bar {
-    flex-shrink: 0;
-    padding: 14px 18px;
-    background: #0f0f16;
-    border-top: 1px solid #1e1e2a;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.b-prompt-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #b8b8c8;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.b-prompt-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 8px;
-    background: linear-gradient(135deg, #8b5cf622, #6366f122);
-    border: 1px solid #8b5cf655;
-    border-radius: 6px;
-    color: #a78bfa;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.b-prompt-input {
-    width: 100%;
-}
-
-.b-prompt-input .q-field__control {
-    background: #16161f !important;
-    border: 1px solid #24243a !important;
-    border-radius: 12px !important;
-    padding: 0 !important;
-    min-height: 80px !important;
-    transition: border-color 0.2s ease !important;
-}
-
-.b-prompt-input .q-field__control:hover {
-    border-color: #33335a !important;
-}
-
-.b-prompt-input:focus-within .q-field__control {
-    border-color: #8b5cf6 !important;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12) !important;
-}
-
-.b-prompt-input .q-field__control:before,
-.b-prompt-input .q-field__control:after {
-    display: none !important;
-}
-
-.b-prompt-input .q-field__label {
-    display: none !important;
-}
-
-.b-prompt-input textarea {
-    padding: 12px 14px !important;
-    background: transparent !important;
-    color: #e8e8ed !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 13px !important;
-    line-height: 1.6 !important;
-    border: 0 !important;
-    outline: none !important;
-    resize: none !important;
-    min-height: 60px !important;
-}
-
-.b-prompt-input textarea::placeholder {
-    color: #5b5b6e !important;
-}
-
-.b-generate-btn {
-    align-self: flex-end;
-    background: linear-gradient(135deg, #8b5cf6, #ec4899) !important;
-    color: white !important;
-    border-radius: 10px !important;
-    padding: 0 20px !important;
-    min-height: 40px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    text-transform: none !important;
-    letter-spacing: 0.2px !important;
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
-    transition: all 0.2s ease !important;
-}
-
-.b-generate-btn:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 22px rgba(236, 72, 153, 0.4) !important;
-}
-
-.b-generate-btn:disabled {
-    opacity: 0.6 !important;
-    transform: none !important;
-}
-
-/* Preview */
-.b-preview-body {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    min-width: 0;
-    padding: 18px;
-    background: #0a0a0f;
-    overflow: hidden;
-}
-
-.b-preview-frame-wrap {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    border: 1px solid #1e1e2a;
-}
-
-.builder-preview-frame {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    border: 0;
-    background: white;
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-    .b-sidebar { width: 250px !important; min-width: 250px; }
-    .b-toolbar { padding: 0 14px; }
-    .b-toggle-btn { padding: 0 10px !important; }
-}
-
-/* Menu (dropdown) dark */
-.q-menu {
-    background: #16161f !important;
-    border: 1px solid #24243a !important;
-    color: #e8e8ed !important;
-}
-.q-menu .q-item {
-    color: #e8e8ed !important;
-    min-height: 38px !important;
-}
-.q-menu .q-item:hover {
-    background: #1e1e2a !important;
-}
-
-/* Loading state */
-.b-generate-btn.loading {
-    background: #33335a !important;
-    cursor: wait !important;
-}
-</style>
-"""
-
+def _render_code_view(files: dict[str, str]) -> str:
+    """Render files as HTML for the code view."""
+    parts = []
+    for filename in ["index.html", "style.css", "script.js"]:
+        content = files.get(filename, "")
+        if content:
+            escaped = html.escape(content)
+            parts.append(
+                f'<div class="code-file-label">📄 {filename}</div>'
+                f'<pre><code>{escaped}</code></pre>'
+            )
+    return "".join(parts) if parts else '<pre>Waiting for code generation...</pre>'
+
+
+# ============================================================
+# PAGE
+# ============================================================
 
 @ui.page("/builder")
 def builder_page() -> None:
-    ui.add_head_html(BUILDER_CSS)
-    ui.add_head_html(
-        '<link rel="preconnect" href="https://fonts.googleapis.com">'
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">'
-    )
+    ui.add_head_html(ARENA_CSS)
 
+    # Load or create initial project
     projects = db.get_all_projects()
     if not projects:
-        db.create_project()
+        pid = db.create_project()
+        for p, c in DEFAULT_FILES.items():
+            db.save_project_file(pid, p, c)
         projects = db.get_all_projects()
 
-    state = {"project_id": projects[0]["id"], "path": "index.html", "view": "preview"}
-    editor = None
-    preview = None
-    status = None
-    status_dot = None
-    current_file_label = None
-    publication_url = None
-    file_items = {}
+    # ========================================
+    # STATE
+    # ========================================
+    state = {
+        "view": "home",              # 'home' or 'arena'
+        "status": "idle",            # 'idle', 'generating', 'ready'
+        "active_option": "A",        # 'A' or 'B'
+        "display_mode": "preview",   # 'preview' or 'code'
+        "prompt": "",
+        "code_A": {},
+        "code_B": {},
+        "voted": False,
+        "published_url_A": "",
+        "published_url_B": "",
+        "project_id_A": None,
+        "project_id_B": None,
+    }
 
-    def load_files() -> dict[str, str]:
-        return {item["path"]: item["content"] for item in db.get_project_files(state["project_id"])}
+    # UI element refs (populated during build)
+    refs = {}
 
-    def update_preview() -> None:
-        if preview is not None:
-            preview.set_content(
-                '<div class="b-preview-frame-wrap">'
-                '<iframe class="builder-preview-frame" sandbox="allow-scripts" '
-                f'srcdoc="{html.escape(_project_document(load_files()), quote=True)}"></iframe>'
-                '</div>'
+    # ========================================
+    # LOGIC
+    # ========================================
+
+    def update_viewer():
+        """Update iframe & code view based on active option."""
+        active_code = state["code_A"] if state["active_option"] == "A" else state["code_B"]
+
+        # Iframe
+        if refs.get("preview_iframe"):
+            doc_html = html.escape(_project_document(active_code), quote=True)
+            refs["preview_iframe"].set_content(
+                f'<iframe class="a-preview-iframe" sandbox="allow-scripts" srcdoc="{doc_html}"></iframe>'
             )
 
-    def set_status(text: str, color: str = "#10b981") -> None:
-        if status is not None:
-            status.clear()
-            with status:
-                ui.html(f'<span class="b-status-dot" style="background:{color};box-shadow:0 0 8px {color}88"></span>')
-                ui.label(text)
+        # Code view
+        if refs.get("code_view"):
+            refs["code_view"].set_content(_render_code_view(active_code))
 
-    def set_view(mode: str) -> None:
-        state["view"] = mode
+        # URL Bar
+        if refs.get("url_bar"):
+            if state["voted"]:
+                url = state["published_url_A"] if state["active_option"] == "A" else state["published_url_B"]
+                refs["url_bar"].clear()
+                with refs["url_bar"]:
+                    ui.html('<i class="material-icons">public</i>')
+                    ui.label(url if url else f"Click Publish for Option {state['active_option']}")
+            else:
+                refs["url_bar"].clear()
+                with refs["url_bar"]:
+                    ui.html('<i class="material-icons">public</i>')
+                    ui.label("Vote to get link")
+
+    def toggle_option(opt: str):
+        state["active_option"] = opt
+        # Update left panel tabs
+        if refs.get("opt_A_tab"):
+            refs["opt_A_tab"].classes(add="active" if opt == "A" else "", remove="active" if opt == "B" else "")
+        if refs.get("opt_B_tab"):
+            refs["opt_B_tab"].classes(add="active" if opt == "B" else "", remove="active" if opt == "A" else "")
+        # Update right panel tabs
+        if refs.get("preview_tab_A"):
+            refs["preview_tab_A"].classes(add="active" if opt == "A" else "", remove="active" if opt == "B" else "")
+        if refs.get("preview_tab_B"):
+            refs["preview_tab_B"].classes(add="active" if opt == "B" else "", remove="active" if opt == "A" else "")
+        update_viewer()
+
+    def set_display_mode(mode: str):
+        state["display_mode"] = mode
         if mode == "code":
-            code_button.classes(add="active")
-            preview_button.classes(remove="active")
-            editor_container.set_visibility(True)
-            preview_container.set_visibility(False)
+            refs["code_view"].classes(add="visible")
+            refs["preview_iframe"].classes(add="hidden")
+            refs["mode_btn_preview"].classes(remove="active")
+            refs["mode_btn_code"].classes(add="active")
         else:
-            preview_button.classes(add="active")
-            code_button.classes(remove="active")
-            editor_container.set_visibility(False)
-            preview_container.set_visibility(True)
-            db.save_project_file(state["project_id"], state["path"], editor.value)
-            update_preview()
+            refs["code_view"].classes(remove="visible")
+            refs["preview_iframe"].classes(remove="hidden")
+            refs["mode_btn_preview"].classes(add="active")
+            refs["mode_btn_code"].classes(remove="active")
 
-    def refresh_file_highlights():
-        for path, item in file_items.items():
-            if path == state["path"]:
-                item.classes(add="active")
-            else:
-                item.classes(remove="active")
-        if current_file_label:
-            current_file_label.set_content(
-                f'<span class="b-current-file">{html.escape(state["path"])}</span>'
-            )
-
-    def select_file(path: str):
-        state["path"] = path
-        files = load_files()
-        if editor is not None:
-            editor.value = files.get(path, "")
-        refresh_file_highlights()
-        if state["view"] != "code":
-            set_view("code")
-
-    def choose_project(event) -> None:
-        state["project_id"] = int(event.value)
-        state["path"] = "index.html"
-        select_file("index.html")
-        publication = db.get_project_publication(state["project_id"])
-        if publication_url is not None:
-            publication_url.set_value(
-                f"/published/{publication['slug']}" if publication else ""
-            )
-        update_preview()
-
-    def save_file() -> None:
-        db.save_project_file(state["project_id"], state["path"], editor.value)
-        set_status("Saved", "#10b981")
-        update_preview()
-        ui.notify(f"✓ {state['path']} saved", type="positive", position="bottom-right")
-
-    def download_project() -> None:
-        db.save_project_file(state["project_id"], state["path"], editor.value)
-        files = load_files()
-        if not files:
-            ui.notify("Generate or save at least one file before downloading.", type="warning")
-            return
-        project = next(
-            item for item in db.get_all_projects() if item["id"] == state["project_id"]
-        )
-        filename = re.sub(r"[^A-Za-z0-9._-]+", "-", project["name"].strip()).strip("-")
-        ui.download(_build_project_zip(files), f"{filename or 'website-project'}.zip")
-        set_status("ZIP downloaded", "#10b981")
-
-    def publish_project() -> str | None:
-        db.save_project_file(state["project_id"], state["path"], editor.value)
-        files = load_files()
-        if not files:
-            ui.notify("Generate or save at least one file before publishing.", type="warning")
-            return None
-        project = next(
-            item for item in db.get_all_projects() if item["id"] == state["project_id"]
-        )
-        slug = _publication_slug(project["id"], project["name"])
-        db.publish_project(project["id"], slug)
-        url = f"/published/{slug}"
-        if publication_url is not None:
-            publication_url.set_value(url)
-        set_status("Published", "#10b981")
-        ui.notify("Website published. URL is ready to open or copy.", type="positive")
-        return url
-
-    def new_project() -> None:
-        db.create_project()
-        ui.navigate.to("/builder")
-
-    async def generate_project() -> None:
-        from app.main import stream_llm
-
-        prompt = builder_prompt.value.strip()
-        if not prompt:
-            ui.notify("Describe the website you want to build.", type="warning")
-            return
-        generate_button.disable()
-        generate_button.classes(add="loading")
-        generate_button.set_text("Generating...")
-        set_status("AI is generating...", "#8b5cf6")
+    async def generate_option(option_name: str, personality: str):
+        """Generate one version by calling the LLM."""
         try:
-            wants_react = bool(re.search(r"\breact\b", prompt, re.IGNORECASE))
-            if wants_react:
-                file_contract = (
-                    "package.json, src/App.jsx, and src/styles.css. "
-                    "App.jsx must define a component named App and use React.createElement-compatible JSX."
-                )
-                format_contract = (
-                    "### FILE: package.json\n```json\n...\n```\n"
-                    "### FILE: src/App.jsx\n```jsx\n...\n```\n"
-                    "### FILE: src/styles.css\n```css\n...\n```"
-                )
+            from app.main import stream_llm
+        except Exception:
+            # Fallback if stream_llm is not available
+            await asyncio.sleep(2)
+            fallback = {
+                "index.html": f'<!DOCTYPE html><html><head><title>Option {option_name}</title></head>'
+                              f'<body><h1>Option {option_name}</h1><p>{personality}</p><p>Prompt: {state["prompt"]}</p></body></html>',
+                "style.css": "body { font-family: sans-serif; padding: 40px; background: #f5efe8; }",
+                "script.js": "console.log('Option " + option_name + "');"
+            }
+            if option_name == "A":
+                state["code_A"] = fallback
             else:
-                file_contract = "index.html, style.css, and script.js"
-                format_contract = (
-                    "### FILE: index.html\n```html\n...\n```\n"
-                    "### FILE: style.css\n```css\n...\n```\n"
-                    "### FILE: script.js\n```javascript\n...\n```"
-                )
-            instruction = (
-                f"Create a responsive, modern, production-quality website using {file_contract}. "
-                "Return only the following file sections, with no extra explanation:\n"
-                f"{format_contract}\n\nUser request: {prompt}"
-            )
+                state["code_B"] = fallback
+            return
+
+        instruction = (
+            f"You are a Senior Web Developer. Create a high-quality, production-ready single-page website. "
+            f"Design style: {personality}. "
+            "Return ONLY these three code blocks in this exact format, no other text:\n\n"
+            "### FILE: index.html\n```html\n<complete HTML>\n```\n\n"
+            "### FILE: style.css\n```css\n<complete CSS>\n```\n\n"
+            "### FILE: script.js\n```javascript\n<JS code>\n```\n\n"
+            f"User request:\n{state['prompt']}"
+        )
+
+        try:
             response = ""
             async for chunk in stream_llm([{"role": "user", "content": instruction}]):
                 response += chunk
+
             files = _parse_generated_files(response)
-            if not files:
-                raise ValueError(
-                    "AI returned no supported files. Ask for HTML or React and try again."
-                )
-            db.update_project_name(state["project_id"], _project_title(prompt))
-            for path, content in files.items():
-                db.save_project_file(state["project_id"], path, content)
-            select_file(state["path"])
-            update_preview()
-            publish_project()
-            set_status("Generated and published", "#10b981")
-            ui.notify("Website generated and published.", type="positive", position="bottom-right")
-        except Exception as error:
-            set_status("Generation failed", "#ef4444")
-            ui.notify(f"Generation failed: {error}", type="negative", timeout=8000)
-        finally:
-            generate_button.enable()
-            generate_button.classes(remove="loading")
-            generate_button.set_text("Generate")
+            if not files or not files.get("index.html"):
+                raise ValueError("No valid HTML generated")
 
-    # ============ UI STRUCTURE ============
-    with ui.row().classes("builder-root w-full no-wrap gap-0"):
+            if option_name == "A":
+                state["code_A"] = files
+            else:
+                state["code_B"] = files
+        except Exception as e:
+            fallback = {
+                "index.html": f'<!DOCTYPE html><html><body><h1>Generation Error</h1><p>{html.escape(str(e))}</p></body></html>',
+                "style.css": "body { padding: 40px; font-family: sans-serif; }",
+                "script.js": ""
+            }
+            if option_name == "A":
+                state["code_A"] = fallback
+            else:
+                state["code_B"] = fallback
 
-        # ---------- SIDEBAR ----------
-        with ui.column().classes("b-sidebar"):
+    async def submit_prompt():
+        text = refs["prompt_input"].value if refs.get("prompt_input") else ""
+        if not text or not text.strip():
+            ui.notify("Please enter a prompt.", type="warning")
+            return
 
+        state["prompt"] = text.strip()
+        state["status"] = "generating"
+        state["voted"] = False
+        state["active_option"] = "A"
+
+        # Swap views
+        refs["home_container"].set_visibility(False)
+        refs["arena_container"].set_visibility(True)
+        refs["user_msg"].set_text(state["prompt"])
+        refs["loading_overlay"].set_visibility(True)
+
+        # Reset toggles
+        toggle_option("A")
+        set_display_mode("preview")
+
+        # Generate both options in parallel
+        await asyncio.gather(
+            generate_option("A", "Clean, minimalist, modern, professional with subtle animations"),
+            generate_option("B", "Bold, creative, vibrant colors, playful with strong visuals"),
+        )
+
+        state["status"] = "ready"
+        refs["loading_overlay"].set_visibility(False)
+        update_viewer()
+
+        ui.notify("✨ Both designs ready! Vote for your favorite.", type="positive", position="bottom-right")
+
+    def cast_vote():
+        """Mark that the user has 'voted' - unlocks publish URL."""
+        if state["status"] != "ready":
+            ui.notify("Wait for generation to finish", type="warning")
+            return
+        state["voted"] = True
+        ui.notify(f"✓ Voted for Option {state['active_option']}!", type="positive")
+        update_viewer()
+
+    def publish_site():
+        if state["status"] != "ready":
+            ui.notify("Wait for generation to complete", type="warning")
+            return
+
+        opt = state["active_option"]
+        code = state["code_A"] if opt == "A" else state["code_B"]
+
+        # Save the selected option and create a stable local publication.
+        project_name = f"Arena {opt}: {state['prompt'][:30]}"
+        pid = db.create_project(name=project_name)
+        for p, c in code.items():
+            db.save_project_file(pid, p, c)
+
+        slug = _publication_slug(pid, project_name)
+        db.publish_project(pid, slug)
+        url = f"/published/{slug}"
+
+        if opt == "A":
+            state["published_url_A"] = url
+            state["project_id_A"] = pid
+        else:
+            state["published_url_B"] = url
+            state["project_id_B"] = pid
+
+        state["voted"] = True
+        update_viewer()
+
+        ui.notify(f"🚀 Option {opt} Published! {url}", type="positive", position="top")
+
+    def go_home():
+        state["view"] = "home"
+        state["status"] = "idle"
+        state["prompt"] = ""
+        state["code_A"] = {}
+        state["code_B"] = {}
+        state["voted"] = False
+        state["published_url_A"] = ""
+        state["published_url_B"] = ""
+        if refs.get("prompt_input"):
+            refs["prompt_input"].value = ""
+        refs["home_container"].set_visibility(True)
+        refs["arena_container"].set_visibility(False)
+
+    def refresh_preview():
+        update_viewer()
+        ui.notify("Preview refreshed", type="info", position="bottom-right")
+
+    def copy_url():
+        opt = state["active_option"]
+        url = state["published_url_A"] if opt == "A" else state["published_url_B"]
+        if url:
+            ui.run_javascript(f'navigator.clipboard.writeText("{url}")')
+            ui.notify("URL copied!", type="positive")
+        else:
+            ui.notify("Publish first to get URL", type="warning")
+
+    # ============================================================
+    # LAYOUT
+    # ============================================================
+
+    with ui.element("div").classes("arena-root"):
+
+        # --- LEFT SIDEBAR ---
+        with ui.element("div").classes("a-sidebar"):
             # Header
-            with ui.element("div").classes("b-sidebar-header"):
-                with ui.element("div").classes("b-brand"):
-                    ui.html('<div class="b-brand-icon">✦</div>')
-                    ui.html('<span class="b-brand-text">Website Builder</span>')
-                ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")) \
-                    .props("flat dense").classes("b-back-btn")
+            with ui.element("div").classes("a-sidebar-header"):
+                ui.html('<div class="a-logo">✦</div>')
+                ui.button(icon="view_sidebar").props("flat dense round").classes("text-grey-7")
 
-            with ui.column().classes("b-sidebar-scroll"):
-                # Projects Section
-                with ui.element("div").classes("b-section"):
-                    ui.html('<div class="b-section-label">Project</div>')
-                    ui.select(
-                        options={str(project["id"]): project["name"] for project in projects},
-                        value=str(state["project_id"]),
-                        on_change=choose_project,
-                    ).props("outlined dense options-dense").classes("b-select w-full")
+            # Nav
+            with ui.element("div").classes("a-nav"):
+                ui.button("New project", icon="edit_square", on_click=go_home).props("flat no-caps").classes("a-nav-btn")
+                ui.button("Search", icon="search").props("flat no-caps").classes("a-nav-btn")
+                ui.button("My Projects", icon="folder_open").props("flat no-caps").classes("a-nav-btn")
+                ui.button("Leaderboards", icon="leaderboard").props("flat no-caps").classes("a-nav-btn")
+                ui.button("Models", icon="view_in_ar").props("flat no-caps").classes("a-nav-btn")
+                ui.button("About", icon="info_outline").props("flat no-caps").classes("a-nav-btn")
 
-                    ui.button("＋  New Project", on_click=new_project) \
-                        .props("unelevated no-caps").classes("b-new-btn")
+            # Recent
+            with ui.element("div").classes("a-recent"):
+                ui.label("RECENT DESIGNS").classes("a-section-title")
+                for name, cls in [
+                    ("React Real Estate Plat...", ""),
+                    ("Responsive Parlour W...", ""),
+                    ("Checkinn Homes Web E...", "gray"),
+                    ("Affordable OTT Subscri...", "gray"),
+                    ("Futuristic Corporate Vid...", "gray"),
+                ]:
+                    with ui.element("div").classes("a-recent-item"):
+                        ui.html(f'<div class="a-recent-dot {cls}"></div>')
+                        ui.label(name)
 
-                # Files Section
-                with ui.element("div").classes("b-section"):
-                    ui.html('<div class="b-section-label">Files</div>')
-                    with ui.element("div").classes("b-file-list").style("padding:0"):
-                        existing_paths = set(load_files())
-                        paths = [path for path in PROJECT_FILES if path in existing_paths]
-                        for path in paths or ["index.html", "style.css", "script.js"]:
-                            tag, color = FILE_ICONS[path]
-                            item = ui.element("div").classes(
-                                "b-file-item" + (" active" if path == "index.html" else "")
-                            )
-                            with item:
-                                ui.html(f'<div class="b-file-tag" style="background:{color}">{tag}</div>')
-                                ui.label(path)
-                            item.on("click", lambda _e=None, p=path: select_file(p))
-                            file_items[path] = item
+            # User
+            with ui.element("div").classes("a-user"):
+                ui.html('<div class="a-avatar">P</div>')
+                ui.label("Prashant").classes("font-medium text-sm")
+                ui.space()
+                ui.icon("unfold_more").classes("text-grey-6 text-sm")
 
-                    ui.button("⬇  Download ZIP", on_click=download_project) \
-                        .props("unelevated no-caps").classes("b-save-btn")
-                    ui.button("↗  Publish website", on_click=publish_project) \
-                        .props("unelevated no-caps").classes("b-save-btn")
+        # --- MAIN AREA ---
+        with ui.element("div").classes("a-main"):
 
-                    publication_url = ui.input(
-                        label="Published URL", readonly=True
-                    ).props("outlined dense append-icon=content_copy").classes("w-full")
+            # Top Nav
+            with ui.element("div").classes("a-topnav"):
+                with ui.row().classes("items-center gap-0"):
+                    ui.label("Design Arena").classes("a-brand-title")
+                    ui.html('<span class="a-brand-sub">by ✦ Saumya Intelligence</span>')
 
-                with ui.element("div").classes("b-prompt-bar"):
-                    with ui.element("div").classes("b-prompt-label"):
-                        ui.html('<span class="b-prompt-badge">✨ AI</span>')
-                        ui.label("Describe your website or changes")
-                    builder_prompt = ui.textarea(
-                        placeholder="Create a premium responsive website for a beauty parlour..."
-                    ).classes("b-prompt-input")
-                    generate_button = ui.button(
-                        "✨  Generate", on_click=generate_project
-                    ).props("unelevated no-caps").classes("b-generate-btn")
+                with ui.element("div").classes("a-top-links"):
+                    ui.button("Leaderboards").props("flat no-caps").classes("a-top-link")
+                    ui.button("Models").props("flat no-caps").classes("a-top-link")
+                    ui.button("EN", icon="language").props("flat no-caps").classes("a-top-link")
 
-            # Footer
-            with ui.element("div").classes("b-sidebar-footer"):
-                ui.html('<div class="b-footer-info">Build beautiful websites<br>with AI in seconds ✨</div>')
+            # ============ HOME SCREEN ============
+            refs["home_container"] = ui.element("div").classes("a-home")
+            with refs["home_container"]:
+                ui.label("What are you creating today?").classes("a-hero-title")
+                with ui.element("div").classes("a-hero-sub"):
+                    ui.label("by")
+                    ui.html('<span class="a-hero-sub-brand">✦ Saumya Intelligence</span>')
+                    ui.label("• 6.7M+ users")
 
-        # ---------- MAIN AREA ----------
-        with ui.column().classes("b-main gap-0"):
+                with ui.element("div").classes("a-prompt-box"):
+                    refs["prompt_input"] = ui.textarea(
+                        placeholder="Describe the website you want to build...\n\ne.g. Create a responsive React parlour website with:\n- Separate pages for About, Services, Gallery\n- Admin panel for content management\n- Modern, production-quality design"
+                    ).props("borderless").classes("a-prompt-input w-full")
 
-            # Toolbar
-            with ui.element("div").classes("b-toolbar"):
-                with ui.element("div").classes("b-toggle-group"):
-                    code_button = ui.button("Code Editor", on_click=lambda: set_view("code")) \
-                        .props("unelevated no-caps").classes("b-toggle-btn")
-                    preview_button = ui.button("Live Preview", on_click=lambda: set_view("preview")) \
-                        .props("unelevated no-caps").classes("b-toggle-btn active")
+                    with ui.element("div").classes("a-prompt-tools"):
+                        with ui.element("div").classes("a-tool-group"):
+                            ui.button(icon="attach_file").props("flat dense").classes("a-tool-icon-btn")
+                            ui.button(icon="cloud_upload").props("flat dense").classes("a-tool-icon-btn")
+                            with ui.element("div").classes("a-tool-chip"):
+                                ui.html('<i class="material-icons" style="font-size:15px;">bolt</i>')
+                                ui.label("FAST")
+                                ui.html('<i class="material-icons" style="font-size:14px;">expand_more</i>')
+                            with ui.element("div").classes("a-tool-chip a-tool-chip-active"):
+                                ui.html('<i class="material-icons" style="font-size:15px;">web</i>')
+                                ui.label("Website")
 
-                status = ui.element("div").classes("b-status")
-                with status:
-                    ui.html('<span class="b-status-dot"></span>')
-                    ui.label("Ready")
+                        ui.button(icon="arrow_upward", on_click=submit_prompt).props("unelevated round").classes("a-send-btn")
 
-            # Workspace
-            with ui.element("div").classes("b-view-container w-full"):
+            # ============ ARENA SCREEN ============
+            refs["arena_container"] = ui.element("div").classes("a-arena")
+            refs["arena_container"].set_visibility(False)
 
-                # LEFT: Editor + AI Prompt
-                with ui.column().classes("b-editor-wrap w-full") as editor_container:
+            with refs["arena_container"]:
 
-                    # Editor Header
-                    with ui.element("div").classes("b-panel-head"):
-                        with ui.element("div").classes("b-panel-title"):
-                            ui.html('<div class="b-panel-dot"><span></span><span></span><span></span></div>')
-                            ui.label("Code Editor")
-                        current_file_label = ui.html('<span class="b-current-file">index.html</span>')
+                # LEFT CHAT PANEL
+                with ui.element("div").classes("a-chat-panel"):
+                    with ui.element("div").classes("a-play-banner"):
+                        ui.html('<i class="material-icons" style="font-size:18px;">sports_esports</i>')
+                        ui.label("Play while you wait")
 
-                    # Editor Body
-                    with ui.element("div").classes("b-editor-body"):
-                        editor = ui.textarea().classes("w-full h-full")
+                    with ui.element("div").classes("a-chat-history"):
+                        refs["user_msg"] = ui.label("").classes("a-msg-user")
 
+                        with ui.element("div").classes("a-msg-card"):
+                            with ui.element("div").classes("a-option-tabs"):
+                                refs["opt_A_tab"] = ui.element("div").classes("a-opt-tab active")
+                                refs["opt_A_tab"].on("click", lambda: toggle_option("A"))
+                                with refs["opt_A_tab"]:
+                                    ui.label("Option A")
 
-                # RIGHT: Preview
-                with ui.column().classes("b-preview-wrap w-full") as preview_container:
-                    with ui.element("div").classes("b-panel-head"):
-                        with ui.element("div").classes("b-panel-title"):
-                            ui.html('<div class="b-panel-dot"><span></span><span></span><span></span></div>')
-                            ui.label("Live Preview")
-                        ui.html('<span class="b-current-file">localhost / preview</span>')
+                                refs["opt_B_tab"] = ui.element("div").classes("a-opt-tab")
+                                refs["opt_B_tab"].on("click", lambda: toggle_option("B"))
+                                with refs["opt_B_tab"]:
+                                    ui.label("Option B")
 
-                    with ui.element("div").classes("b-preview-body"):
-                        preview = ui.html().classes("w-full h-full")
+                            with ui.element("div").classes("a-artifact-row"):
+                                with ui.row().classes("items-center gap-2 no-wrap"):
+                                    ui.html('<i class="material-icons" style="font-size:18px;">web</i>')
+                                    ui.label("Web Apps artifact")
+                                ui.label("6m 18.0s").classes("a-artifact-timer")
 
-    # Initial load
-    select_file("index.html")
-    publication = db.get_project_publication(state["project_id"])
-    if publication_url is not None and publication:
-        publication_url.set_value(f"/published/{publication['slug']}")
-    update_preview()
-    set_view("preview")
+                            with ui.element("div").classes("a-agent-status-line"):
+                                ui.label("Bringing your vision to life...")
+
+                        with ui.element("div").classes("a-using-tool"):
+                            ui.label("Using batch_create_files")
+                            ui.icon("expand_more").classes("text-grey-6 text-sm")
+
+                    # Chat input at bottom
+                    with ui.element("div").classes("a-chat-input-wrap"):
+                        with ui.element("div").classes("a-chat-input-box"):
+                            ui.textarea(placeholder="Vote on the design above first...").props("borderless").classes("w-full")
+                            with ui.element("div").classes("a-chat-input-tools"):
+                                with ui.row().classes("gap-1 items-center"):
+                                    ui.button(icon="attach_file").props("flat dense round").classes("a-tool-icon-btn").style("width:28px; height:28px; min-width:28px; min-height:28px;")
+                                    ui.button(icon="cloud_upload").props("flat dense round").classes("a-tool-icon-btn").style("width:28px; height:28px; min-width:28px; min-height:28px;")
+                                ui.button(icon="arrow_upward", on_click=cast_vote).props("unelevated round dense").classes("a-send-btn").style("width:32px; height:32px; min-width:32px; min-height:32px;")
+
+                # RIGHT PREVIEW PANEL
+                with ui.element("div").classes("a-preview-panel"):
+
+                    # Tabs
+                    with ui.element("div").classes("a-preview-tabs"):
+                        refs["preview_tab_A"] = ui.element("div").classes("a-preview-tab active")
+                        refs["preview_tab_A"].on("click", lambda: toggle_option("A"))
+                        with refs["preview_tab_A"]:
+                            ui.html('<i class="material-icons a-preview-tab-icon">emoji_events</i>')
+                            ui.label("Option A")
+
+                        refs["preview_tab_B"] = ui.element("div").classes("a-preview-tab")
+                        refs["preview_tab_B"].on("click", lambda: toggle_option("B"))
+                        with refs["preview_tab_B"]:
+                            ui.html('<i class="material-icons a-preview-tab-icon">emoji_events</i>')
+                            ui.label("Option B")
+
+                    # Toolbar
+                    with ui.element("div").classes("a-preview-toolbar"):
+                        with ui.element("div").classes("a-mode-toggle"):
+                            refs["mode_btn_preview"] = ui.button(icon="visibility", on_click=lambda: set_display_mode("preview")).props("flat").classes("a-mode-btn active")
+                            refs["mode_btn_code"] = ui.button(icon="code", on_click=lambda: set_display_mode("code")).props("flat").classes("a-mode-btn")
+
+                        refs["url_bar"] = ui.element("div").classes("a-url-bar")
+                        with refs["url_bar"]:
+                            ui.html('<i class="material-icons">public</i>')
+                            ui.label("Vote to get link")
+
+                        ui.button(icon="content_copy", on_click=copy_url).props("flat dense").classes("a-toolbar-btn")
+                        ui.button(icon="open_in_new").props("flat dense").classes("a-toolbar-btn")
+                        ui.button(icon="refresh", on_click=refresh_preview).props("flat dense").classes("a-toolbar-btn")
+                        ui.button(icon="open_in_full").props("flat dense").classes("a-toolbar-btn")
+                        ui.button("Publish", icon="lock_open", on_click=publish_site).props("unelevated no-caps").classes("a-publish-btn")
+
+                    # Preview Body
+                    with ui.element("div").classes("a-preview-body"):
+
+                        # Loading state
+                        refs["loading_overlay"] = ui.element("div").classes("a-loading")
+                        refs["loading_overlay"].set_visibility(False)
+                        with refs["loading_overlay"]:
+                            with ui.element("div").classes("a-globe"):
+                                ui.html('<i class="material-icons">language</i>')
+                            ui.label("Building Preview").classes("a-load-title")
+                            ui.label("The agent is working on your app...").classes("a-load-sub")
+                            with ui.element("div").classes("a-dots"):
+                                ui.html('<div class="a-dot"></div><div class="a-dot"></div><div class="a-dot"></div>')
+
+                        # Iframe
+                        refs["preview_iframe"] = ui.html('<div style="padding:80px; text-align:center; color:#999;">Submit a prompt to see your website here</div>').classes("a-preview-iframe-wrap w-full h-full")
+
+                        # Code view
+                        refs["code_view"] = ui.html('').classes("a-code-view")

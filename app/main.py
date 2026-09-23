@@ -913,19 +913,28 @@ def load_chat(chat):
 # LLM
 # ============================================================
 
-async def stream_llm(messages):
+class ModelUnavailableError(RuntimeError):
+    """Raised when the backend rejects the requested model."""
+
+
+async def stream_llm(messages, model=None):
     payload = {
         "messages": messages,
         "temperature": 0.2,
         "stream": True,
     }
-    if selected_model.lower() != "auto":
-        payload["model"] = selected_model
+    requested_model = selected_model if model is None else model
+    if requested_model.lower() != "auto":
+        payload["model"] = requested_model
 
     async with httpx.AsyncClient(timeout=180) as client:
         async with client.stream("POST", LLM_URL, json=payload) as response:
             if response.is_error:
                 details = (await response.aread()).decode(errors="replace")[:1000]
+                if "not available" in details.lower() and "model" in payload:
+                    raise ModelUnavailableError(
+                        f"Model \"{requested_model}\" is not available on this server."
+                    )
                 raise RuntimeError(
                     f"LLM API returned {response.status_code}: {details}"
                 )
@@ -962,7 +971,7 @@ async def stream_llm(messages):
 
 
 async def send_message():
-    global current_messages, pending_attachments
+    global current_messages, pending_attachments, selected_model
 
     text = message_input.value.strip()
 
@@ -1043,12 +1052,23 @@ async def send_message():
             }
             for message in current_messages[:-1]
         ]
-        async for chunk in stream_llm(api_messages):
-            assistant_message["content"] += chunk
-            assistant_element.set_content(
-                format_ai_html(assistant_message["content"])
-            )
-            await asyncio.sleep(0)
+        try:
+            async for chunk in stream_llm(api_messages):
+                assistant_message["content"] += chunk
+                assistant_element.set_content(
+                    format_ai_html(assistant_message["content"])
+                )
+                await asyncio.sleep(0)
+        except ModelUnavailableError as model_error:
+            ui.notify(f"{model_error} Switching to Auto.", type="warning")
+            selected_model = "Auto"
+            model_button.set_text("Auto  ▾")
+            async for chunk in stream_llm(api_messages, model="Auto"):
+                assistant_message["content"] += chunk
+                assistant_element.set_content(
+                    format_ai_html(assistant_message["content"])
+                )
+                await asyncio.sleep(0)
 
         if not assistant_message["content"]:
             assistant_message["content"] = "The model returned an empty response."

@@ -32,10 +32,8 @@ an explicit model ID.
 When the app runs in Docker, Compose automatically uses
 `http://host.docker.internal:3010/v1/chat/completions`.
 
-If the API is another Docker container, set `LLM_URL` to that container's
-Compose service name instead, for example
-`http://my-api-container:3010/v1/chat/completions`. The URL must be reachable
-from inside the `quotation-ai` container.
+This project expects the host-based `copilot-api` service on port `3010`; its
+GitHub CLI authentication stays on the host and is not copied into this app.
 
 ```powershell
 docker compose up --build -d

@@ -79,7 +79,8 @@ def models_endpoint(completions_url: str) -> str:
 
 
 async def discover_models() -> list[str]:
-    """Read model IDs from the configured Docker/API backend."""
+    """Read model IDs when supported, otherwise use the Copilot menu list."""
+    fallback_models = list(dict.fromkeys(PRIMARY_MODELS + OTHER_MODELS))
     headers = {}
     api_key = config.API_KEY.strip()
     if api_key and api_key.lower() != "not-needed":
@@ -93,14 +94,15 @@ async def discover_models() -> list[str]:
             response.raise_for_status()
             data = response.json()
     except (httpx.HTTPError, ValueError, TypeError):
-        return []
+        return fallback_models
 
     models = data.get("data", []) if isinstance(data, dict) else []
-    return [
+    discovered_models = [
         item["id"]
         for item in models
         if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip()
     ]
+    return discovered_models or fallback_models
 
 selected_model = "Auto" if LLM_MODEL.lower() == "auto" else LLM_MODEL
 
@@ -1119,9 +1121,14 @@ async def stream_llm(messages, model=None):
     if requested_model.lower() != "auto":
         payload["model"] = requested_model
 
+    headers = {}
+    api_key = config.API_KEY.strip()
+    if api_key and api_key.lower() != "not-needed":
+        headers["Authorization"] = f"Bearer {api_key}"
+
     timeout = httpx.Timeout(config.REQUEST_TIMEOUT, connect=min(config.REQUEST_TIMEOUT, 10))
     async with httpx.AsyncClient(timeout=timeout) as client:
-        async with client.stream("POST", LLM_URL, json=payload) as response:
+        async with client.stream("POST", LLM_URL, json=payload, headers=headers) as response:
             if response.is_error:
                 details = (await response.aread()).decode(errors="replace")[:1000]
                 if "not available" in details.lower() and "model" in payload:

@@ -418,12 +418,12 @@ body {
 
 .message-ai {
     max-width: 85%;
-    line-height: 1.65;
+    line-height: 1.45;
 }
 
 .message-ai .code-block {
     width: min(100%, 760px);
-    margin: 14px 0;
+    margin: 8px 0;
     overflow: hidden;
     border: 1px solid #2f3338;
     border-radius: 9px;
@@ -459,7 +459,7 @@ body {
 
 .message-ai .code-block pre {
     margin: 0;
-    padding: 14px 16px;
+    padding: 10px 14px;
     overflow-x: auto;
     white-space: pre;
 }
@@ -524,21 +524,22 @@ body {
 
 .composer-input {
     width: 100%;
-    min-height: 42px;
+    min-height: 46px;
     gap: 8px !important;
 }
 
 .composer .q-field__control,
 .composer .q-field__native {
-    height: 42px !important;
-    min-height: 42px !important;
-    max-height: 42px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
     color: var(--text);
-    font-size: 15px;
+    font-size: 17px;
+    line-height: 1.45;
 }
 
 .composer textarea.q-field__native {
-    padding: 10px 0 6px !important;
+    padding: 9px 0 7px !important;
     resize: none !important;
 }
 
@@ -801,13 +802,15 @@ def render_messages():
 
 def format_ai_html(text: str) -> str:
     import html
+    import re
 
     # Very small Markdown-like renderer.
     # For a production app you can replace this with markdown-it.
     parts = text.split("```")
 
     if len(parts) == 1:
-        escaped = html.escape(parts[0])
+        compact = re.sub(r"\n{3,}", "\n\n", parts[0])
+        escaped = html.escape(compact)
         return (
             escaped
             .replace("\n", "<br>")
@@ -817,7 +820,8 @@ def format_ai_html(text: str) -> str:
     output = ""
     for index, part in enumerate(parts):
         if index % 2 == 0:
-            output += html.escape(part).replace("\n", "<br>")
+            compact = re.sub(r"\n{3,}", "\n\n", part)
+            output += html.escape(compact).replace("\n", "<br>")
         else:
             lines = part.split("\n", 1)
             language = lines[0].strip() if len(lines) > 1 else ""

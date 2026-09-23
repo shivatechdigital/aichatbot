@@ -10,11 +10,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import html as html_mod
+import importlib.util
 import io
 import json
+import pkgutil
 import re
 import zipfile
 from pathlib import Path
+
+if not hasattr(pkgutil, "find_loader"):
+    pkgutil.find_loader = lambda name: importlib.util.find_spec(name)
 
 import uvicorn
 from nicegui import app, ui
@@ -288,6 +293,22 @@ def _make_zip(files: dict[str, str]) -> bytes:
         for path, content in sorted(files.items()):
             z.writestr(path, content)
     return buf.getvalue()
+
+
+def _parse_generated_files(raw: str) -> dict[str, str]:
+    return _parse_files(raw)
+
+
+def _project_document(files: dict[str, str]) -> str:
+    return _combine_document(files)
+
+
+def _project_title(prompt: str) -> str:
+    return _title_from_prompt(prompt)
+
+
+def _build_project_zip(files: dict[str, str]) -> bytes:
+    return _make_zip(files)
 
 
 def _slug(project_id: int, name: str) -> string:
@@ -678,7 +699,7 @@ def builder_page():
                     # chat input
                     with ui.element("div").classes("chat-input-w"):
                         with ui.element("div").classes("chat-ibox"):
-                            ui.textarea(props="borderless autogrow").classes("w-full").placeholder("Vote above first…")
+                            ui.textarea().props("borderless autogrow").classes("w-full").placeholder("Vote above first…")
                             with ui.element("div").classes("chat-itools"):
                                 with ui.row().classes("gap-1 items-center"):
                                     ui.button(icon="attach_file").props("flat dense round").classes("tool-btn").style("width:28px;height:28px;min-width:28px;min-height:28px")

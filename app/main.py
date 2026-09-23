@@ -1170,7 +1170,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     "w-8 h-8 flex items-center justify-center font-bold"
                 )
                 with ui.column().classes("gap-0"):
-                    ui.label("Prashant").classes("text-sm font-semibold")
+                    ui.label("Saumya").classes("text-sm font-semibold")
                     ui.label("Saumya AI").classes("small-muted")
 
     # ---------------- Main ----------------

@@ -384,16 +384,19 @@ body {
 
 .suggestion-grid .q-btn::before { box-shadow: none !important; }
 .suggestion-grid .q-btn:hover { background: white !important; }
-}
 
 .message-user {
     background: var(--user);
     border-radius: 18px;
     padding: 10px 15px;
     max-width: 75%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
 }
 
 .user-message-group {
+    width: 100%;
     max-width: 78%;
     margin-left: auto;
     gap: 7px !important;
@@ -460,7 +463,19 @@ body {
 
 .message-ai {
     max-width: 85%;
+    min-width: 0;
+    overflow-wrap: anywhere;
     line-height: 1.45;
+}
+
+.chat-scroll > .q-column,
+.chat-scroll > .q-row {
+    width: 100%;
+    min-width: 0;
+}
+
+.chat-scroll .message-ai {
+    flex: 1 1 auto;
 }
 
 .builder-shell {

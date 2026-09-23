@@ -692,7 +692,7 @@ def render_messages():
                     "text-3xl font-semibold mt-4"
                 )
                 ui.label(
-                    "Ask anything. Your messages are sent to your My AI model."
+                    "Ask anything. Your messages are sent to your Saumya AI model."
                 ).classes("small-muted")
 
                 with ui.grid(columns=2).classes("suggestion-grid w-full mt-8 gap-3"):
@@ -1120,7 +1120,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
         with ui.row().classes(
             "sidebar-brand w-full items-center justify-between no-wrap"
         ):
-            ui.label("My AI").classes("sidebar-brand-title")
+            ui.label("Saumya AI").classes("sidebar-brand-title")
             ui.button(icon="side_navigation", on_click=toggle_sidebar).props(
                 "flat round dense aria-label='Toggle sidebar'"
             )
@@ -1171,7 +1171,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                 )
                 with ui.column().classes("gap-0"):
                     ui.label("Prashant").classes("text-sm font-semibold")
-                    ui.label("My AI").classes("small-muted")
+                    ui.label("Saumya AI").classes("small-muted")
 
     # ---------------- Main ----------------
     with ui.column().classes("chat-main flex-1 h-full min-w-0 gap-0"):
@@ -1229,7 +1229,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     )
 
                     message_input = ui.textarea(
-                        placeholder="Message My AI..."
+                        placeholder="Message Saumya AI..."
                     ).props(
                         "autogrow outlined=false borderless"
                     ).classes(
@@ -1244,7 +1244,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     )
 
             ui.label(
-                "My AI can make mistakes. Check important information."
+                "Saumya AI can make mistakes. Check important information."
             ).classes(
                 "small-muted text-center w-full mt-2"
             )
@@ -1332,7 +1332,7 @@ with ui.dialog() as settings_dialog, ui.card().classes("w-[500px] max-w-[90vw]")
 # ============================================================
 
 ui.run(
-    title="My AI",
+    title="Saumya AI",
     host="0.0.0.0",
     port=int(os.getenv("PORT", os.getenv("APP_PORT", "7860"))),
     reload=False,

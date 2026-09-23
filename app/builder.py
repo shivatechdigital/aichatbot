@@ -651,15 +651,10 @@ def builder_page():
                     ui.element("span").classes("home-brand"); ui.label("✦ Saumya Intelligence")
                     ui.label(" • 6.7M+ users")
                 with ui.element("div").classes("prompt-box"):
-                    r["inp"] = ui.textarea(
-                        placeholder=(
-                            "Describe the website you want to build...\n\n"
-                            "e.g. A responsive React beauty parlour website with:\n"
-                            "- About, Services, Gallery pages\n"
-                            "- Admin panel for content management\n"
-                            "- Modern, production-quality design"
-                        )
-                    ).props("autogrow borderless").classes("prompt-input w-full")
+                    r["inp"] = ui.textarea().props(
+                        'autogrow borderless placeholder="Describe the website you want to build... '
+                        'e.g. A responsive React beauty parlour website with About, Services and Gallery pages"'
+                    ).classes("prompt-input w-full")
                     with ui.element("div").classes("prompt-tools"):
                         with ui.element("div").classes("tool-grp"):
                             ui.button(icon="attach_file").props("flat dense").classes("tool-btn")
@@ -699,7 +694,9 @@ def builder_page():
                     # chat input
                     with ui.element("div").classes("chat-input-w"):
                         with ui.element("div").classes("chat-ibox"):
-                            ui.textarea().props("borderless autogrow").classes("w-full").placeholder("Vote above first…")
+                            ui.textarea().props(
+                                'borderless autogrow placeholder="Vote above first..."'
+                            ).classes("w-full")
                             with ui.element("div").classes("chat-itools"):
                                 with ui.row().classes("gap-1 items-center"):
                                     ui.button(icon="attach_file").props("flat dense round").classes("tool-btn").style("width:28px;height:28px;min-width:28px;min-height:28px")

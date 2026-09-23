@@ -17,6 +17,8 @@ from datetime import datetime
 from docx import Document
 from pypdf import PdfReader
 
+import app.builder  # noqa: F401 - registers the Website Builder page
+
 # ============================================================
 # Configuration
 # ============================================================
@@ -419,6 +421,63 @@ body {
 .message-ai {
     max-width: 85%;
     line-height: 1.45;
+}
+
+.builder-shell {
+    background: var(--canvas);
+    color: var(--text);
+}
+
+.builder-sidebar {
+    width: 250px !important;
+    padding: 18px 14px;
+    gap: 12px !important;
+    border-right: 1px solid var(--border);
+    background: var(--sidebar);
+}
+
+.builder-main { min-width: 0; }
+.builder-toolbar {
+    min-height: 60px;
+    padding: 0 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.builder-workspace { min-height: 0; }
+.builder-editor-panel,
+.builder-preview-panel {
+    gap: 10px !important;
+    min-height: 0;
+    padding: 16px;
+}
+
+.builder-editor-panel { border-right: 1px solid var(--border); }
+.builder-editor,
+.builder-prompt { min-height: 0; }
+.builder-editor textarea,
+.builder-prompt textarea {
+    height: 100% !important;
+    min-height: 0 !important;
+    resize: none !important;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.builder-prompt textarea { font-family: "Segoe UI", Arial, sans-serif; }
+.builder-preview {
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: white;
+}
+.builder-preview-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    border: 0;
+    background: white;
 }
 
 .message-ai .code-block {
@@ -1212,6 +1271,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
             ui.button(
                 "Projects",
                 icon="folder_open",
+                on_click=lambda: ui.navigate.to("/builder"),
             ).props("flat align=left").classes(
                 "w-full normal-case"
             )

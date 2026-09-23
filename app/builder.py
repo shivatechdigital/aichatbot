@@ -416,7 +416,9 @@ BUILDER_CSS = """
 
 .b-view-container {
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
     padding: 18px;
 }
@@ -444,6 +446,10 @@ BUILDER_CSS = """
 
 .b-editor-wrap,
 .b-preview-wrap {
+    flex: 1 1 auto;
+    width: 100% !important;
+    min-width: 0;
+    min-height: 0;
     height: 100%;
     overflow: hidden;
 }
@@ -659,7 +665,9 @@ BUILDER_CSS = """
 /* Preview */
 .b-preview-body {
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
+    min-width: 0;
     padding: 18px;
     background: #0a0a0f;
     overflow: hidden;
@@ -668,6 +676,8 @@ BUILDER_CSS = """
 .b-preview-frame-wrap {
     width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
     background: white;
     border-radius: 12px;
     overflow: hidden;
@@ -679,6 +689,8 @@ BUILDER_CSS = """
     display: block;
     width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
     border: 0;
     background: white;
 }

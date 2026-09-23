@@ -99,7 +99,9 @@ BUILDER_CSS = """
 
 /* ============ SIDEBAR ============ */
 .b-sidebar {
-    width: 280px !important;
+    width: 30% !important;
+    min-width: 320px;
+    max-width: 400px;
     height: 100vh;
     padding: 0 !important;
     background: #0f0f16;
@@ -161,6 +163,13 @@ BUILDER_CSS = """
 
 .b-section {
     padding: 18px 20px 12px;
+}
+
+.b-sidebar-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 18px;
 }
 
 .b-section-label {
@@ -318,6 +327,32 @@ BUILDER_CSS = """
     gap: 16px;
 }
 
+.b-toggle-group {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid #24243a;
+    border-radius: 10px;
+    background: #16161f;
+}
+
+.b-toggle-btn {
+    min-height: 32px !important;
+    padding: 0 18px !important;
+    border-radius: 7px !important;
+    background: transparent !important;
+    color: #8b8b98 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    box-shadow: none !important;
+}
+
+.b-toggle-btn.active {
+    background: #2a2942 !important;
+    color: white !important;
+}
+
 .b-toolbar-title {
     display: flex;
     align-items: center;
@@ -379,6 +414,13 @@ BUILDER_CSS = """
     overflow: hidden;
 }
 
+.b-view-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: 18px;
+}
+
 .b-editor-col {
     flex: 1 1 50%;
     min-width: 0;
@@ -397,6 +439,12 @@ BUILDER_CSS = """
     display: flex;
     flex-direction: column;
     background: #0a0a0f;
+    overflow: hidden;
+}
+
+.b-editor-wrap,
+.b-preview-wrap {
+    height: 100%;
     overflow: hidden;
 }
 
@@ -637,10 +685,9 @@ BUILDER_CSS = """
 
 /* Responsive */
 @media (max-width: 900px) {
-    .b-workspace { flex-direction: column; overflow-y: auto; }
-    .b-editor-col, .b-preview-col { flex: 0 0 auto; min-height: 400px; }
-    .b-editor-col { border-right: 0; border-bottom: 1px solid #1e1e2a; }
-    .b-sidebar { width: 220px !important; }
+    .b-sidebar { width: 250px !important; min-width: 250px; }
+    .b-toolbar { padding: 0 14px; }
+    .b-toggle-btn { padding: 0 10px !important; }
 }
 
 /* Menu (dropdown) dark */
@@ -682,11 +729,11 @@ def builder_page() -> None:
             db.save_project_file(project_id, path, content)
         projects = db.get_all_projects()
 
-    state = {"project_id": projects[0]["id"], "path": "index.html"}
+    state = {"project_id": projects[0]["id"], "path": "index.html", "view": "preview"}
     editor = None
     preview = None
-    project_select = None
     status = None
+    status_dot = None
     current_file_label = None
     file_items = {}
 
@@ -709,6 +756,21 @@ def builder_page() -> None:
                 ui.html(f'<span class="b-status-dot" style="background:{color};box-shadow:0 0 8px {color}88"></span>')
                 ui.label(text)
 
+    def set_view(mode: str) -> None:
+        state["view"] = mode
+        if mode == "code":
+            code_button.classes(add="active")
+            preview_button.classes(remove="active")
+            editor_container.set_visibility(True)
+            preview_container.set_visibility(False)
+        else:
+            preview_button.classes(add="active")
+            code_button.classes(remove="active")
+            editor_container.set_visibility(False)
+            preview_container.set_visibility(True)
+            db.save_project_file(state["project_id"], state["path"], editor.value)
+            update_preview()
+
     def refresh_file_highlights():
         for path, item in file_items.items():
             if path == state["path"]:
@@ -716,9 +778,9 @@ def builder_page() -> None:
             else:
                 item.classes(remove="active")
         if current_file_label:
-                current_file_label.set_content(
-                    f'<span class="b-current-file">{html.escape(state["path"])}</span>'
-                )
+            current_file_label.set_content(
+                f'<span class="b-current-file">{html.escape(state["path"])}</span>'
+            )
 
     def select_file(path: str):
         state["path"] = path
@@ -726,6 +788,8 @@ def builder_page() -> None:
         if editor is not None:
             editor.value = files.get(path, "")
         refresh_file_highlights()
+        if state["view"] != "code":
+            set_view("code")
 
     def choose_project(event) -> None:
         state["project_id"] = int(event.value)
@@ -800,35 +864,47 @@ def builder_page() -> None:
                 ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")) \
                     .props("flat dense").classes("b-back-btn")
 
-            # Projects Section
-            with ui.element("div").classes("b-section"):
-                ui.html('<div class="b-section-label">Project</div>')
-                project_select = ui.select(
-                    options={str(project["id"]): project["name"] for project in projects},
-                    value=str(state["project_id"]),
-                    on_change=choose_project,
-                ).props("outlined dense options-dense").classes("b-select w-full")
+            with ui.column().classes("b-sidebar-scroll"):
+                # Projects Section
+                with ui.element("div").classes("b-section"):
+                    ui.html('<div class="b-section-label">Project</div>')
+                    ui.select(
+                        options={str(project["id"]): project["name"] for project in projects},
+                        value=str(state["project_id"]),
+                        on_change=choose_project,
+                    ).props("outlined dense options-dense").classes("b-select w-full")
 
-                ui.button("＋  New Project", on_click=new_project) \
-                    .props("unelevated no-caps").classes("b-new-btn")
+                    ui.button("＋  New Project", on_click=new_project) \
+                        .props("unelevated no-caps").classes("b-new-btn")
 
-            # Files Section
-            with ui.element("div").classes("b-section"):
-                ui.html('<div class="b-section-label">Files</div>')
-                with ui.element("div").classes("b-file-list").style("padding:0"):
-                    for path in ["index.html", "style.css", "script.js"]:
-                        tag, color = FILE_ICONS[path]
-                        item = ui.element("div").classes(
-                            "b-file-item" + (" active" if path == "index.html" else "")
-                        )
-                        with item:
-                            ui.html(f'<div class="b-file-tag" style="background:{color}">{tag}</div>')
-                            ui.label(path)
-                        item.on("click", lambda _e=None, p=path: select_file(p))
-                        file_items[path] = item
+                # Files Section
+                with ui.element("div").classes("b-section"):
+                    ui.html('<div class="b-section-label">Files</div>')
+                    with ui.element("div").classes("b-file-list").style("padding:0"):
+                        for path in ["index.html", "style.css", "script.js"]:
+                            tag, color = FILE_ICONS[path]
+                            item = ui.element("div").classes(
+                                "b-file-item" + (" active" if path == "index.html" else "")
+                            )
+                            with item:
+                                ui.html(f'<div class="b-file-tag" style="background:{color}">{tag}</div>')
+                                ui.label(path)
+                            item.on("click", lambda _e=None, p=path: select_file(p))
+                            file_items[path] = item
 
-                ui.button("💾  Save File", on_click=save_file) \
-                    .props("unelevated no-caps").classes("b-save-btn")
+                    ui.button("💾  Save File", on_click=save_file) \
+                        .props("unelevated no-caps").classes("b-save-btn")
+
+                with ui.element("div").classes("b-prompt-bar"):
+                    with ui.element("div").classes("b-prompt-label"):
+                        ui.html('<span class="b-prompt-badge">✨ AI</span>')
+                        ui.label("Describe your website or changes")
+                    builder_prompt = ui.textarea(
+                        placeholder="Create a premium responsive website for a beauty parlour..."
+                    ).classes("b-prompt-input")
+                    generate_button = ui.button(
+                        "✨  Generate", on_click=generate_project
+                    ).props("unelevated no-caps").classes("b-generate-btn")
 
             # Footer
             with ui.element("div").classes("b-sidebar-footer"):
@@ -839,11 +915,11 @@ def builder_page() -> None:
 
             # Toolbar
             with ui.element("div").classes("b-toolbar"):
-                with ui.element("div").classes("b-toolbar-title"):
-                    ui.html('<div class="b-toolbar-icon">✨</div>')
-                    with ui.column().classes("gap-0"):
-                        ui.html('<div class="b-toolbar-heading">Create a website with AI</div>')
-                        ui.html('<div class="b-toolbar-sub">Design, edit, and preview in real time</div>')
+                with ui.element("div").classes("b-toggle-group"):
+                    code_button = ui.button("Code Editor", on_click=lambda: set_view("code")) \
+                        .props("unelevated no-caps").classes("b-toggle-btn")
+                    preview_button = ui.button("Live Preview", on_click=lambda: set_view("preview")) \
+                        .props("unelevated no-caps").classes("b-toggle-btn active")
 
                 status = ui.element("div").classes("b-status")
                 with status:
@@ -851,10 +927,10 @@ def builder_page() -> None:
                     ui.label("Ready")
 
             # Workspace
-            with ui.row().classes("b-workspace w-full no-wrap gap-0"):
+            with ui.element("div").classes("b-view-container w-full"):
 
                 # LEFT: Editor + AI Prompt
-                with ui.column().classes("b-editor-col gap-0"):
+                with ui.column().classes("b-editor-wrap w-full") as editor_container:
 
                     # Editor Header
                     with ui.element("div").classes("b-panel-head"):
@@ -867,23 +943,9 @@ def builder_page() -> None:
                     with ui.element("div").classes("b-editor-body"):
                         editor = ui.textarea().classes("w-full h-full")
 
-                    # AI Prompt Bar
-                    with ui.element("div").classes("b-prompt-bar"):
-                        with ui.element("div").classes("b-prompt-label"):
-                            ui.html('<span class="b-prompt-badge">✨ AI</span>')
-                            ui.label("Describe your website or changes")
-
-                        builder_prompt = ui.textarea(
-                            placeholder="e.g. Create a premium responsive landing page for a beauty parlour with hero, services, gallery, and contact sections..."
-                        ).classes("b-prompt-input")
-
-                        generate_button = ui.button(
-                            "✨  Generate",
-                            on_click=generate_project,
-                        ).props("unelevated no-caps").classes("b-generate-btn")
 
                 # RIGHT: Preview
-                with ui.column().classes("b-preview-col gap-0"):
+                with ui.column().classes("b-preview-wrap w-full") as preview_container:
                     with ui.element("div").classes("b-panel-head"):
                         with ui.element("div").classes("b-panel-title"):
                             ui.html('<div class="b-panel-dot"><span></span><span></span><span></span></div>')
@@ -896,3 +958,4 @@ def builder_page() -> None:
     # Initial load
     select_file("index.html")
     update_preview()
+    set_view("preview")

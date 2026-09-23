@@ -2,8 +2,10 @@
 
 import html
 import importlib.util
+import io
 import pkgutil
 import re
+import zipfile
 
 if not hasattr(pkgutil, "find_loader"):
     pkgutil.find_loader = lambda name: importlib.util.find_spec(name)
@@ -47,10 +49,28 @@ FILE_ICONS = {
     "index.html": ("HTML", "#e34c26"),
     "style.css": ("CSS", "#2965f1"),
     "script.js": ("JS", "#f7df1e"),
+    "package.json": ("JSON", "#8b5cf6"),
+    "src/App.jsx": ("JSX", "#61dafb"),
+    "src/styles.css": ("CSS", "#2965f1"),
 }
+
+PROJECT_FILES = list(FILE_ICONS)
 
 
 def _project_document(files: dict[str, str]) -> str:
+    react_code = files.get("src/App.jsx")
+    if react_code:
+        css = files.get("src/styles.css", "")
+        return f"""<!doctype html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>{css}</style></head><body><div id="root"></div>
+<script type="text/babel">{react_code}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script></body></html>"""
     index = files.get("index.html", DEFAULT_FILES["index.html"])
     css = files.get("style.css", "")
     js = files.get("script.js", "")
@@ -70,16 +90,40 @@ def _project_document(files: dict[str, str]) -> str:
 
 
 def _parse_generated_files(response: str) -> dict[str, str]:
-    pattern = re.compile(
-        r"###\s*FILE:\s*([^\n]+)\n```[^\n]*\n(.*?)```",
+    files = {}
+    header_pattern = re.compile(
+        r"###\s*FILE:\s*([^\n]+)\n(.*?)(?=###\s*FILE:|\Z)",
         re.IGNORECASE | re.DOTALL,
     )
-    files = {}
-    for path, content in pattern.findall(response):
+    for path, block in header_pattern.findall(response):
         normalized = path.strip().replace("\\", "/")
-        if normalized in {"index.html", "style.css", "script.js"}:
-            files[normalized] = content.strip() + "\n"
+        if normalized not in FILE_ICONS and normalized != "package.json":
+            continue
+        fenced = re.search(r"```[^\n]*\n(.*?)```", block, re.DOTALL)
+        files[normalized] = (fenced.group(1) if fenced else block).strip() + "\n"
+
+    if files:
+        return files
+
+    fallback_paths = ["index.html", "style.css", "script.js"]
+    fenced_pattern = re.compile(r"```(html|css|javascript|js)\s*\n(.*?)```", re.IGNORECASE | re.DOTALL)
+    for language, content in fenced_pattern.findall(response):
+        path = {"html": "index.html", "css": "style.css", "javascript": "script.js", "js": "script.js"}[language.lower()]
+        files[path] = content.strip() + "\n"
     return files
+
+
+def _project_title(prompt: str) -> str:
+    words = re.findall(r"[A-Za-z0-9]+", prompt)
+    return " ".join(words[:6]).strip().title() or "Website Project"
+
+
+def _build_project_zip(files: dict[str, str]) -> bytes:
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as project_zip:
+        for path, content in sorted(files.items()):
+            project_zip.writestr(path, content)
+    return archive.getvalue()
 
 
 BUILDER_CSS = """
@@ -745,9 +789,7 @@ def builder_page() -> None:
 
     projects = db.get_all_projects()
     if not projects:
-        project_id = db.create_project()
-        for path, content in DEFAULT_FILES.items():
-            db.save_project_file(project_id, path, content)
+        db.create_project()
         projects = db.get_all_projects()
 
     state = {"project_id": projects[0]["id"], "path": "index.html", "view": "preview"}
@@ -824,10 +866,21 @@ def builder_page() -> None:
         update_preview()
         ui.notify(f"✓ {state['path']} saved", type="positive", position="bottom-right")
 
+    def download_project() -> None:
+        db.save_project_file(state["project_id"], state["path"], editor.value)
+        files = load_files()
+        if not files:
+            ui.notify("Generate or save at least one file before downloading.", type="warning")
+            return
+        project = next(
+            item for item in db.get_all_projects() if item["id"] == state["project_id"]
+        )
+        filename = re.sub(r"[^A-Za-z0-9._-]+", "-", project["name"].strip()).strip("-")
+        ui.download(_build_project_zip(files), f"{filename or 'website-project'}.zip")
+        set_status("ZIP downloaded", "#10b981")
+
     def new_project() -> None:
-        project_id = db.create_project()
-        for path, content in DEFAULT_FILES.items():
-            db.save_project_file(project_id, path, content)
+        db.create_project()
         ui.navigate.to("/builder")
 
     async def generate_project() -> None:
@@ -842,21 +895,38 @@ def builder_page() -> None:
         generate_button.set_text("Generating...")
         set_status("AI is generating...", "#8b5cf6")
         try:
+            wants_react = bool(re.search(r"\breact\b", prompt, re.IGNORECASE))
+            if wants_react:
+                file_contract = (
+                    "package.json, src/App.jsx, and src/styles.css. "
+                    "App.jsx must define a component named App and use React.createElement-compatible JSX."
+                )
+                format_contract = (
+                    "### FILE: package.json\n```json\n...\n```\n"
+                    "### FILE: src/App.jsx\n```jsx\n...\n```\n"
+                    "### FILE: src/styles.css\n```css\n...\n```"
+                )
+            else:
+                file_contract = "index.html, style.css, and script.js"
+                format_contract = (
+                    "### FILE: index.html\n```html\n...\n```\n"
+                    "### FILE: style.css\n```css\n...\n```\n"
+                    "### FILE: script.js\n```javascript\n...\n```"
+                )
             instruction = (
-                "Create a responsive, modern, production-quality website using only "
-                "index.html, style.css, and script.js. Use beautiful typography, "
-                "spacing, and colors. Return only these sections, with no extra explanation:\n"
-                "### FILE: index.html\n```html\n...\n```\n"
-                "### FILE: style.css\n```css\n...\n```\n"
-                "### FILE: script.js\n```javascript\n...\n```\n\n"
-                f"User request: {prompt}"
+                f"Create a responsive, modern, production-quality website using {file_contract}. "
+                "Return only the following file sections, with no extra explanation:\n"
+                f"{format_contract}\n\nUser request: {prompt}"
             )
             response = ""
             async for chunk in stream_llm([{"role": "user", "content": instruction}]):
                 response += chunk
             files = _parse_generated_files(response)
             if not files:
-                raise ValueError("The model did not return valid website files.")
+                raise ValueError(
+                    "AI returned no supported files. Ask for HTML or React and try again."
+                )
+            db.update_project_name(state["project_id"], _project_title(prompt))
             for path, content in files.items():
                 db.save_project_file(state["project_id"], path, content)
             select_file(state["path"])
@@ -865,7 +935,7 @@ def builder_page() -> None:
             ui.notify("✨ Website generated!", type="positive", position="bottom-right")
         except Exception as error:
             set_status("Generation failed", "#ef4444")
-            ui.notify(str(error), type="negative")
+            ui.notify(f"Generation failed: {error}", type="negative", timeout=8000)
         finally:
             generate_button.enable()
             generate_button.classes(remove="loading")
@@ -902,7 +972,9 @@ def builder_page() -> None:
                 with ui.element("div").classes("b-section"):
                     ui.html('<div class="b-section-label">Files</div>')
                     with ui.element("div").classes("b-file-list").style("padding:0"):
-                        for path in ["index.html", "style.css", "script.js"]:
+                        existing_paths = set(load_files())
+                        paths = [path for path in PROJECT_FILES if path in existing_paths]
+                        for path in paths or ["index.html", "style.css", "script.js"]:
                             tag, color = FILE_ICONS[path]
                             item = ui.element("div").classes(
                                 "b-file-item" + (" active" if path == "index.html" else "")
@@ -913,7 +985,7 @@ def builder_page() -> None:
                             item.on("click", lambda _e=None, p=path: select_file(p))
                             file_items[path] = item
 
-                    ui.button("💾  Save File", on_click=save_file) \
+                    ui.button("⬇  Download ZIP", on_click=download_project) \
                         .props("unelevated no-caps").classes("b-save-btn")
 
                 with ui.element("div").classes("b-prompt-bar"):

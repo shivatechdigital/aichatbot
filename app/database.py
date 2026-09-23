@@ -126,6 +126,14 @@ class Database:
                 raise RuntimeError("Project could not be created")
             return cursor.lastrowid
 
+    def update_project_name(self, project_id: int, name: str) -> None:
+        with self.get_connection() as connection:
+            connection.execute(
+                "UPDATE projects SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (name.strip() or "Untitled website", project_id),
+            )
+            connection.commit()
+
     def get_all_projects(self) -> list[dict]:
         with self.get_connection() as connection:
             rows = connection.execute(

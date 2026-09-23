@@ -1,4 +1,12 @@
-from app.builder import DEFAULT_FILES, _parse_generated_files, _project_document
+from app.builder import (
+    DEFAULT_FILES,
+    _build_project_zip,
+    _parse_generated_files,
+    _project_document,
+    _project_title,
+)
+import io
+import zipfile
 
 
 def test_generated_files_are_parsed_and_limited_to_supported_files():
@@ -37,3 +45,37 @@ def test_preview_inlines_css_and_javascript():
     assert "<script>document.title = 'Preview';</script>" in document
     assert 'href="style.css"' not in document
     assert 'src="script.js"' not in document
+
+
+def test_react_files_are_parsed_and_previewed():
+    response = """### FILE: package.json
+```json
+{"scripts":{"dev":"vite"}}
+```
+### FILE: src/App.jsx
+```jsx
+function App() { return <h1>Salon</h1>; }
+```
+### FILE: src/styles.css
+```css
+h1 { color: hotpink; }
+```"""
+
+    files = _parse_generated_files(response)
+    assert set(files) == {"package.json", "src/App.jsx", "src/styles.css"}
+    document = _project_document(files)
+    assert "ReactDOM.createRoot" in document
+    assert "function App()" in document
+    assert "color: hotpink" in document
+
+
+def test_project_title_comes_from_prompt():
+    assert _project_title("Build a premium beauty parlour website") == "Build A Premium Beauty Parlour Website"
+    assert _project_title("   ") == "Website Project"
+
+
+def test_project_zip_contains_all_files():
+    archive = _build_project_zip({"index.html": "<h1>Hi</h1>", "src/App.jsx": "export default App;"})
+    with zipfile.ZipFile(io.BytesIO(archive)) as project_zip:
+        assert project_zip.namelist() == ["index.html", "src/App.jsx"]
+        assert project_zip.read("index.html") == b"<h1>Hi</h1>"

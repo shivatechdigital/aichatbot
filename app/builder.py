@@ -134,6 +134,28 @@ def _build_project_zip(files: dict[str, str]) -> bytes:
     return archive.getvalue()
 
 
+def _publication_slug(project_id: int, name: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "website"
+    return f"{base}-{project_id}"
+
+
+@ui.page("/published/{slug}")
+def published_page(slug: str) -> None:
+    publication = db.get_publication_by_slug(slug)
+    if not publication:
+        ui.label("Published website not found").classes("text-h4 q-pa-xl")
+        return
+    files = {
+        item["path"]: item["content"]
+        for item in db.get_project_files(publication["project_id"])
+    }
+    ui.add_head_html("<style>html,body,#q-app{margin:0;width:100%;height:100%;overflow:hidden}</style>")
+    ui.html(
+        '<iframe title="Published website" style="border:0;width:100%;height:100vh" '
+        f'srcdoc="{html.escape(_project_document(files), quote=True)}"></iframe>'
+    )
+
+
 BUILDER_CSS = """
 <style>
 /* ============ BUILDER GLOBAL ============ */
@@ -806,6 +828,7 @@ def builder_page() -> None:
     status = None
     status_dot = None
     current_file_label = None
+    publication_url = None
     file_items = {}
 
     def load_files() -> dict[str, str]:
@@ -866,6 +889,11 @@ def builder_page() -> None:
         state["project_id"] = int(event.value)
         state["path"] = "index.html"
         select_file("index.html")
+        publication = db.get_project_publication(state["project_id"])
+        if publication_url is not None:
+            publication_url.set_value(
+                f"/published/{publication['slug']}" if publication else ""
+            )
         update_preview()
 
     def save_file() -> None:
@@ -886,6 +914,24 @@ def builder_page() -> None:
         filename = re.sub(r"[^A-Za-z0-9._-]+", "-", project["name"].strip()).strip("-")
         ui.download(_build_project_zip(files), f"{filename or 'website-project'}.zip")
         set_status("ZIP downloaded", "#10b981")
+
+    def publish_project() -> str | None:
+        db.save_project_file(state["project_id"], state["path"], editor.value)
+        files = load_files()
+        if not files:
+            ui.notify("Generate or save at least one file before publishing.", type="warning")
+            return None
+        project = next(
+            item for item in db.get_all_projects() if item["id"] == state["project_id"]
+        )
+        slug = _publication_slug(project["id"], project["name"])
+        db.publish_project(project["id"], slug)
+        url = f"/published/{slug}"
+        if publication_url is not None:
+            publication_url.set_value(url)
+        set_status("Published", "#10b981")
+        ui.notify("Website published. URL is ready to open or copy.", type="positive")
+        return url
 
     def new_project() -> None:
         db.create_project()
@@ -939,8 +985,9 @@ def builder_page() -> None:
                 db.save_project_file(state["project_id"], path, content)
             select_file(state["path"])
             update_preview()
-            set_status("Generated successfully", "#10b981")
-            ui.notify("✨ Website generated!", type="positive", position="bottom-right")
+            publish_project()
+            set_status("Generated and published", "#10b981")
+            ui.notify("Website generated and published.", type="positive", position="bottom-right")
         except Exception as error:
             set_status("Generation failed", "#ef4444")
             ui.notify(f"Generation failed: {error}", type="negative", timeout=8000)
@@ -995,6 +1042,12 @@ def builder_page() -> None:
 
                     ui.button("⬇  Download ZIP", on_click=download_project) \
                         .props("unelevated no-caps").classes("b-save-btn")
+                    ui.button("↗  Publish website", on_click=publish_project) \
+                        .props("unelevated no-caps").classes("b-save-btn")
+
+                    publication_url = ui.input(
+                        label="Published URL", readonly=True
+                    ).props("outlined dense append-icon=content_copy").classes("w-full")
 
                 with ui.element("div").classes("b-prompt-bar"):
                     with ui.element("div").classes("b-prompt-label"):
@@ -1058,5 +1111,8 @@ def builder_page() -> None:
 
     # Initial load
     select_file("index.html")
+    publication = db.get_project_publication(state["project_id"])
+    if publication_url is not None and publication:
+        publication_url.set_value(f"/published/{publication['slug']}")
     update_preview()
     set_view("preview")

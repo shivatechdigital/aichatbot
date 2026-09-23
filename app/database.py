@@ -1,6 +1,7 @@
 """SQLite persistence for conversations and messages."""
 
 import sqlite3
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -68,6 +69,14 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_project_files_project
                     ON project_files(project_id, path);
+
+                CREATE TABLE IF NOT EXISTS project_publications (
+                    project_id INTEGER PRIMARY KEY,
+                    slug TEXT NOT NULL UNIQUE,
+                    published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (project_id) REFERENCES projects(id)
+                        ON DELETE CASCADE
+                );
                 """
             )
             connection.commit()
@@ -179,6 +188,43 @@ class Database:
                 "SELECT path, content, updated_at FROM project_files "
                 "WHERE project_id = ? AND path = ?",
                 (project_id, path.replace("\\", "/")),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def publish_project(self, project_id: int, slug: str) -> dict:
+        normalized_slug = slug.strip().strip("/")
+        if not normalized_slug or not re.fullmatch(r"[a-z0-9-]+", normalized_slug):
+            raise ValueError("Publication slug is invalid")
+        with self.get_connection() as connection:
+            connection.execute(
+                "INSERT INTO project_publications (project_id, slug) VALUES (?, ?) "
+                "ON CONFLICT(project_id) DO UPDATE SET slug = excluded.slug, "
+                "published_at = CURRENT_TIMESTAMP",
+                (project_id, normalized_slug),
+            )
+            connection.commit()
+            row = connection.execute(
+                "SELECT project_id, slug, published_at FROM project_publications "
+                "WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            return dict(row)
+
+    def get_project_publication(self, project_id: int) -> dict | None:
+        with self.get_connection() as connection:
+            row = connection.execute(
+                "SELECT project_id, slug, published_at FROM project_publications "
+                "WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_publication_by_slug(self, slug: str) -> dict | None:
+        with self.get_connection() as connection:
+            row = connection.execute(
+                "SELECT project_id, slug, published_at FROM project_publications "
+                "WHERE slug = ?",
+                (slug.strip().strip("/"),),
             ).fetchone()
             return dict(row) if row else None
 

@@ -13,6 +13,7 @@ services:
       LLM_URL: http://host.docker.internal:3010/v1/chat/completions
       LLM_MODEL: ${LLM_MODEL:-auto}
       API_KEY: ${API_KEY:-}
+      COPILOT_MODELS: ${COPILOT_MODELS:-gpt-5.4,gpt-5-mini,gpt-5.3-codex,gpt-5.4-mini,gpt-5.5,gpt-5.6-luna,gpt-6-astra,gpt-6-luna,gpt-6-sol,claude-sonnet-5,claude-fable-5,claude-fable-5.1,claude-haiku-4.5,claude-opus-4.7,claude-opus-4.8,claude-opus-5,claude-opus-5.5,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash,grok-4.5,grok-4.6,grok-4.7}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

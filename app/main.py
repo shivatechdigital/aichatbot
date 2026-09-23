@@ -35,38 +35,41 @@ LLM_URL = os.getenv(
 
 LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("MODEL_NAME", "auto"))
 
-PRIMARY_MODELS = [
-    "Claude Sonnet 5",
-    "GPT-5.6 Sol",
-    "GPT-5.6 Terra",
-    "MAI-Code-1.1-Flash",
-]
+MODEL_OPTIONS = {
+    "gpt-5.4": "gpt-5.4",
+    "gpt-5-mini": "gpt-5-mini",
+    "gpt-5.3-codex": "gpt-5.3-codex",
+    "gpt-5.4-mini": "gpt-5.4-mini",
+    "gpt-5.5": "gpt-5.5",
+    "gpt-5.6-luna": "gpt-5.6-luna",
+    "gpt-6-astra": "gpt-6-astra",
+    "gpt-6-luna": "gpt-6-luna",
+    "gpt-6-sol": "gpt-6-sol",
+    "claude-sonnet-5": "claude-sonnet-5",
+    "claude-fable-5": "claude-fable-5",
+    "claude-fable-5.1": "claude-fable-5.1",
+    "claude-haiku-4.5": "claude-haiku-4.5",
+    "claude-opus-4.7": "claude-opus-4.7",
+    "claude-opus-4.8": "claude-opus-4.8",
+    "claude-opus-5": "claude-opus-5",
+    "claude-opus-5.5": "claude-opus-5.5",
+    "gemini-3.5-flash": "gemini-3.5-flash",
+    "gemini-3.6-flash": "gemini-3.6-flash",
+    "gemini-3.7-flash": "gemini-3.7-flash",
+    "gemini-3.8-flash": "gemini-3.8-flash",
+    "grok-4.5": "grok-4.5",
+    "grok-4.6": "grok-4.6",
+    "grok-4.7": "grok-4.7",
+}
 
-OTHER_MODELS = [
-    "Claude Fable 5",
-    "Claude Fable 5.1",
-    "Claude Haiku 4.5",
-    "Claude Opus 4.7",
-    "Claude Opus 4.8",
-    "Claude Opus 5",
-    "Claude Opus 5.5",
-    "Gemini 3.5 Flash",
-    "Gemini 3.6 Flash",
-    "Gemini 3.7 Flash",
-    "Gemini 3.8 Flash",
-    "GPT-5 mini",
-    "GPT-5.3-Codex",
-    "GPT-5.4",
-    "GPT-5.4 mini",
-    "GPT-5.5",
-    "GPT-5.6 Luna",
-    "GPT-6 Astra",
-    "GPT-6 Luna",
-    "GPT-6 Sol",
-    "Grok 4.5",
-    "Grok 4.6",
-    "Grok 4.7",
-]
+
+def configured_model_options() -> dict[str, str]:
+    """Read model IDs confirmed by the host's Copilot CLI checks."""
+    configured = os.getenv("COPILOT_MODELS", "").split(",")
+    model_ids = [model.strip() for model in configured if model.strip()]
+    if not model_ids:
+        return MODEL_OPTIONS
+    return {model: model for model in model_ids}
 
 
 def models_endpoint(completions_url: str) -> str:
@@ -642,17 +645,12 @@ body {
 }
 
 .composer-layer > * { pointer-events: auto; }
-
 .composer {
     min-height: 0;
     padding: 10px 12px !important;
 }
 
 .composer-input {
-    width: 100%;
-    min-height: 46px;
-    gap: 8px !important;
-}
 
 .composer .q-field__control,
 .composer .q-field__native {
@@ -1311,6 +1309,7 @@ def select_model(name: str):
 
 async def refresh_model_menu():
     model_ids = await discover_models()
+    configured_options = configured_model_options()
     model_options_container.clear()
     with model_options_container:
         ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
@@ -1318,12 +1317,16 @@ async def refresh_model_menu():
             ui.separator()
             for model_id in model_ids:
                 ui.menu_item(
-                    model_id,
+                    MODEL_OPTIONS.get(model_id, model_id),
                     on_click=lambda n=model_id: select_model(n),
                 )
         else:
             ui.separator()
-            ui.label("No models found in API").classes("small-muted px-3 py-1")
+            for label, model_id in configured_options.items():
+                ui.menu_item(
+                    label,
+                    on_click=lambda n=model_id: select_model(n),
+                )
 
 with ui.row().classes("w-full h-screen gap-0 no-wrap"):
 

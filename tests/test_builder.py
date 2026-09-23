@@ -67,6 +67,7 @@ h1 { color: hotpink; }
     assert "ReactDOM.createRoot" in document
     assert "function App()" in document
     assert "color: hotpink" in document
+    assert "from 'react'" not in document
 
 
 def test_project_title_comes_from_prompt():

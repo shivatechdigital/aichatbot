@@ -51,23 +51,31 @@ FILE_ICONS = {
     "script.js": ("JS", "#f7df1e"),
     "package.json": ("JSON", "#8b5cf6"),
     "src/App.jsx": ("JSX", "#61dafb"),
+    "src/App.js": ("JS", "#f7df1e"),
     "src/styles.css": ("CSS", "#2965f1"),
+    "src/App.css": ("CSS", "#2965f1"),
 }
 
 PROJECT_FILES = list(FILE_ICONS)
 
 
 def _project_document(files: dict[str, str]) -> str:
-    react_code = files.get("src/App.jsx")
+    react_code = files.get("src/App.jsx") or files.get("src/App.js")
     if react_code:
-        css = files.get("src/styles.css", "")
+        css = files.get("src/styles.css", "") + files.get("src/App.css", "")
+        react_code = re.sub(r"^\s*import\s+.*?;\s*$", "", react_code, flags=re.MULTILINE)
+        react_code = re.sub(r"\bexport\s+default\s+", "", react_code)
         return f"""<!doctype html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>{css}</style></head><body><div id="root"></div>
-<script type="text/babel">{react_code}
+<script type="text/babel">
+window.addEventListener('error', function(event) {{
+    document.body.innerHTML = '<pre style="padding:24px;color:#b91c1c;white-space:pre-wrap;font:14px monospace">Preview error: ' + event.message + '</pre>';
+}});
+{react_code}
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
 </script></body></html>"""
@@ -106,9 +114,9 @@ def _parse_generated_files(response: str) -> dict[str, str]:
         return files
 
     fallback_paths = ["index.html", "style.css", "script.js"]
-    fenced_pattern = re.compile(r"```(html|css|javascript|js)\s*\n(.*?)```", re.IGNORECASE | re.DOTALL)
+    fenced_pattern = re.compile(r"```(html|css|javascript|js|jsx|json)\s*\n(.*?)```", re.IGNORECASE | re.DOTALL)
     for language, content in fenced_pattern.findall(response):
-        path = {"html": "index.html", "css": "style.css", "javascript": "script.js", "js": "script.js"}[language.lower()]
+        path = {"html": "index.html", "css": "style.css", "javascript": "script.js", "js": "script.js", "jsx": "src/App.jsx", "json": "package.json"}[language.lower()]
         files[path] = content.strip() + "\n"
     return files
 

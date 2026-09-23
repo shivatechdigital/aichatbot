@@ -426,6 +426,7 @@ body {
 .builder-shell {
     background: var(--canvas);
     color: var(--text);
+    overflow: hidden;
 }
 
 .builder-sidebar {
@@ -436,35 +437,49 @@ body {
     background: var(--sidebar);
 }
 
-.builder-main { min-width: 0; }
+.builder-main {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
 .builder-toolbar {
+    flex: 0 0 60px;
     min-height: 60px;
     padding: 0 22px;
     border-bottom: 1px solid var(--border);
 }
 
-.builder-workspace { min-height: 0; }
+.builder-workspace {
+    min-height: 0;
+    overflow: hidden;
+}
 .builder-editor-panel,
 .builder-preview-panel {
+    flex: 1 1 0 !important;
     gap: 10px !important;
     min-height: 0;
     padding: 16px;
+    overflow: hidden;
 }
 
 .builder-editor-panel { border-right: 1px solid var(--border); }
 .builder-editor,
 .builder-prompt { min-height: 0; }
+.builder-editor { flex: 1 1 auto; }
+.builder-prompt { flex: 0 0 150px; }
 .builder-editor textarea,
 .builder-prompt textarea {
-    height: 100% !important;
     min-height: 0 !important;
     resize: none !important;
     font-family: Consolas, "Cascadia Code", monospace;
     font-size: 13px;
     line-height: 1.5;
 }
+.builder-editor textarea { height: 100% !important; }
+.builder-prompt textarea { height: 150px !important; }
 .builder-prompt textarea { font-family: "Segoe UI", Arial, sans-serif; }
 .builder-preview {
+    flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -475,9 +490,24 @@ body {
     display: block;
     width: 100%;
     height: 100%;
-    min-height: 420px;
+    min-height: 0;
     border: 0;
     background: white;
+}
+
+@media (max-width: 800px) {
+    .builder-shell { overflow: auto; }
+    .builder-sidebar {
+        width: 190px !important;
+        padding: 14px 10px;
+    }
+    .builder-workspace { overflow: auto; }
+    .builder-editor-panel,
+    .builder-preview-panel {
+        min-width: 48vw;
+        padding: 10px;
+    }
+    .builder-toolbar { padding: 0 12px; }
 }
 
 .message-ai .code-block {

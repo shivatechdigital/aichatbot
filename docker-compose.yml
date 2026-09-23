@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      LLM_URL: ${LLM_URL:-http://host.docker.internal:3010/v1/chat/completions}
+      LLM_URL: http://host.docker.internal:3010/v1/chat/completions
       LLM_MODEL: ${LLM_MODEL:-auto}
       API_KEY: ${API_KEY:-}
     extra_hosts:

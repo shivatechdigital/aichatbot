@@ -46,7 +46,7 @@ class LLMClient:
             ) as response:
                 response.raise_for_status()
                 received_content = False
-                for line in response.iter_lines(decode_unicode=True):
+                for line in response.iter_lines(chunk_size=1, decode_unicode=True):
                     if not line:
                         continue
                     data = line.removeprefix("data:").strip()

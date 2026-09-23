@@ -23,6 +23,7 @@ def test_auto_model_uses_server_default(mock_post):
     assert list(client.stream_chat([{"role": "user", "content": "Hi"}])) == ["Hello"]
     payload = mock_post.call_args.kwargs["json"]
     assert "model" not in payload
+    response.iter_lines.assert_called_once_with(chunk_size=1, decode_unicode=True)
 
 
 def test_not_needed_key_does_not_send_authorization():

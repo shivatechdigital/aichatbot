@@ -421,6 +421,55 @@ body {
     line-height: 1.65;
 }
 
+.message-ai .code-block {
+    width: min(100%, 760px);
+    margin: 14px 0;
+    overflow: hidden;
+    border: 1px solid #2f3338;
+    border-radius: 9px;
+    background: #17191c;
+    color: #e8eaed;
+    line-height: 1.45;
+}
+
+.message-ai .code-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 36px;
+    padding: 0 10px 0 14px;
+    border-bottom: 1px solid #2f3338;
+    background: #202328;
+    color: #aeb4bd;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+}
+
+.message-ai .code-copy {
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #c6cbd2;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.message-ai .code-copy:hover { background: #343941; color: white; }
+
+.message-ai .code-block pre {
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.message-ai .code-block code {
+    color: inherit;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 13px;
+}
+
 .message-ai.streaming::after {
     display: inline-block;
     width: 7px;
@@ -752,15 +801,15 @@ def render_messages():
 
 def format_ai_html(text: str) -> str:
     import html
-    escaped = html.escape(text)
 
     # Very small Markdown-like renderer.
     # For a production app you can replace this with markdown-it.
-    parts = escaped.split("```")
+    parts = text.split("```")
 
     if len(parts) == 1:
+        escaped = html.escape(parts[0])
         return (
-            parts[0]
+            escaped
             .replace("\n", "<br>")
             .replace("**", "<strong>", 1)
         )
@@ -768,9 +817,23 @@ def format_ai_html(text: str) -> str:
     output = ""
     for index, part in enumerate(parts):
         if index % 2 == 0:
-            output += part.replace("\n", "<br>")
+            output += html.escape(part).replace("\n", "<br>")
         else:
-            output += f"<pre><code>{part.strip()}</code></pre>"
+            lines = part.split("\n", 1)
+            language = lines[0].strip() if len(lines) > 1 else ""
+            code = lines[1] if len(lines) > 1 else part
+            language = html.escape(language or "text")
+            code = html.escape(code.strip("\n"))
+            output += (
+                '<div class="code-block">'
+                f'<div class="code-toolbar"><span>{language}</span>'
+                '<button class="code-copy" type="button" '
+                'onclick="navigator.clipboard.writeText(this.parentElement'
+                '.nextElementSibling.textContent).then(() => { this.textContent = '
+                '&#39;Copied&#39;; setTimeout(() => this.textContent = &#39;Copy&#39;, 1200); })">'
+                'Copy</button></div>'
+                f'<pre><code>{code}</code></pre></div>'
+            )
 
     return output
 

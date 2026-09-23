@@ -584,6 +584,21 @@ document.addEventListener('keydown', (event) => {
         document.querySelector('.send-message-button')?.click();
     }
 }, true);
+
+const observeChat = () => {
+    const chat = document.querySelector('.chat-scroll');
+    if (!chat || chat.dataset.autoScrollReady) return;
+    chat.dataset.autoScrollReady = 'true';
+    new MutationObserver(() => {
+        chat.scrollTop = chat.scrollHeight;
+    }).observe(chat, {childList: true, subtree: true, characterData: true});
+};
+
+new MutationObserver(observeChat).observe(document.body, {
+    childList: true,
+    subtree: true,
+});
+observeChat();
 </script>
 """)
 
@@ -979,10 +994,6 @@ async def send_message():
             assistant_message["content"] += chunk
             assistant_element.set_content(
                 format_ai_html(assistant_message["content"])
-            )
-            await ui.run_javascript(
-                "const chat = document.querySelector('.chat-scroll');"
-                "if (chat) chat.scrollTop = chat.scrollHeight;"
             )
             await asyncio.sleep(0)
 

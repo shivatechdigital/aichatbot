@@ -31,6 +31,41 @@ LLM_URL = os.getenv(
 
 LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("MODEL_NAME", "auto"))
 
+PRIMARY_MODELS = [
+    "Claude Sonnet 5",
+    "GPT-5.6 Sol",
+    "GPT-5.6 Terra",
+    "MAI-Code-1.1-Flash",
+]
+
+OTHER_MODELS = [
+    "Claude Fable 5",
+    "Claude Fable 5.1",
+    "Claude Haiku 4.5",
+    "Claude Opus 4.7",
+    "Claude Opus 4.8",
+    "Claude Opus 5",
+    "Claude Opus 5.5",
+    "Gemini 3.5 Flash",
+    "Gemini 3.6 Flash",
+    "Gemini 3.7 Flash",
+    "Gemini 3.8 Flash",
+    "GPT-5 mini",
+    "GPT-5.3-Codex",
+    "GPT-5.4",
+    "GPT-5.4 mini",
+    "GPT-5.5",
+    "GPT-5.6 Luna",
+    "GPT-6 Astra",
+    "GPT-6 Luna",
+    "GPT-6 Sol",
+    "Grok 4.5",
+    "Grok 4.6",
+    "Grok 4.7",
+]
+
+selected_model = "Auto" if LLM_MODEL.lower() == "auto" else LLM_MODEL
+
 # If the browser is running on the same Docker host, this Python
 # backend can talk to the LLM directly.
 # For Docker -> host.docker.internal to work on Linux, run the
@@ -252,6 +287,24 @@ body {
 
 .chat-header .q-btn {
     color: var(--text) !important;
+}
+
+.model-menu {
+    width: 230px;
+    padding: 6px 0;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+}
+
+.model-menu .q-item {
+    min-height: 34px;
+    padding: 4px 14px;
+    font-size: 13px;
+}
+
+.model-menu-scroll {
+    max-height: 240px;
+    overflow-y: auto;
 }
 
 .chat-scroll {
@@ -866,8 +919,8 @@ async def stream_llm(messages):
         "temperature": 0.2,
         "stream": True,
     }
-    if LLM_MODEL.lower() != "auto":
-        payload["model"] = LLM_MODEL
+    if selected_model.lower() != "auto":
+        payload["model"] = selected_model
 
     async with httpx.AsyncClient(timeout=180) as client:
         async with client.stream("POST", LLM_URL, json=payload) as response:
@@ -1029,6 +1082,13 @@ def toggle_sidebar():
     sidebar_panel.set_visibility(not sidebar_collapsed)
     sidebar_open_button.set_visibility(sidebar_collapsed)
 
+
+def select_model(name: str):
+    global selected_model
+    selected_model = name
+    model_button.set_text(f"{name}  ▾")
+    model_menu.close()
+
 with ui.row().classes("w-full h-screen gap-0 no-wrap"):
 
     # ---------------- Sidebar ----------------
@@ -1107,11 +1167,26 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
         with ui.row().classes(
             "chat-header w-full items-center px-5"
         ):
-            ui.button(
-                "My AI  ▾",
-            ).props("flat").classes(
+            model_button = ui.button(f"{selected_model}  ▾").props("flat").classes(
                 "font-semibold normal-case"
             )
+            with model_button:
+                with ui.menu().classes("model-menu") as model_menu:
+                    ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
+                    ui.separator()
+                    for model_name in PRIMARY_MODELS:
+                        ui.menu_item(
+                            model_name,
+                            on_click=lambda n=model_name: select_model(n),
+                        )
+                    ui.separator()
+                    ui.label("Other Models").classes("small-muted px-3 py-1")
+                    with ui.column().classes("model-menu-scroll gap-0"):
+                        for model_name in OTHER_MODELS:
+                            ui.menu_item(
+                                model_name,
+                                on_click=lambda n=model_name: select_model(n),
+                            )
 
         messages_container = ui.column().classes(
             "chat-scroll flex-1 w-full px-4 pb-32"

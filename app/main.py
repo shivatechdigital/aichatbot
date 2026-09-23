@@ -79,8 +79,7 @@ def models_endpoint(completions_url: str) -> str:
 
 
 async def discover_models() -> list[str]:
-    """Read model IDs when supported, otherwise use the Copilot menu list."""
-    fallback_models = list(dict.fromkeys(PRIMARY_MODELS + OTHER_MODELS))
+    """Read model IDs when the backend supports model discovery."""
     headers = {}
     api_key = config.API_KEY.strip()
     if api_key and api_key.lower() != "not-needed":
@@ -94,7 +93,7 @@ async def discover_models() -> list[str]:
             response.raise_for_status()
             data = response.json()
     except (httpx.HTTPError, ValueError, TypeError):
-        return fallback_models
+        return []
 
     models = data.get("data", []) if isinstance(data, dict) else []
     discovered_models = [
@@ -102,7 +101,7 @@ async def discover_models() -> list[str]:
         for item in models
         if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip()
     ]
-    return discovered_models or fallback_models
+    return discovered_models
 
 selected_model = "Auto" if LLM_MODEL.lower() == "auto" else LLM_MODEL
 

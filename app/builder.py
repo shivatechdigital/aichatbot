@@ -1,999 +1,338 @@
-"""Design Arena - Production Level UI for AI Website Generation Battle."""
+"""Design Arena – Production Website Builder UI
+Dual-option AI generation battle with live preview, code view,
+publish-to-URL flow, and ZIP download.
 
-import html
-import importlib.util
+Integrates with app.database.db  and  app.main.stream_llm .
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import html as html_mod
 import io
 import json
-import pkgutil
 import re
-import asyncio
 import zipfile
+from pathlib import Path
 
-if not hasattr(pkgutil, "find_loader"):
-    pkgutil.find_loader = lambda name: importlib.util.find_spec(name)
+import uvicorn
+from nicegui import app, ui
 
-from nicegui import ui
 from app.database import db
 
+# ════════════════════════════════════════════════════════════════════
+#  DEFAULTS
+# ════════════════════════════════════════════════════════════════════
 
-# ============================================================
-# DEFAULTS
-# ============================================================
-
-DEFAULT_FILES = {
+DEFAULT_FILES: dict[str, str] = {
     "index.html": """<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>New website</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <main class="hero">
-      <h1>Start designing here.</h1>
-      <p>Enter a prompt to generate your website.</p>
-    </main>
-    <script src="script.js"></script>
-  </body>
-</html>
-""",
-    "style.css": """body { margin: 0; font-family: Arial, sans-serif; }
-.hero { min-height: 100vh; display: grid; place-content: center; padding: 32px; background: #f5efe8; text-align: center; }
-h1 { font-size: 48px; margin: 0 0 12px 0; }
-p { color: #6d625a; }
-""",
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>New website</title>
+<link rel="stylesheet" href="style.css"/></head>
+<body>
+<main class="hero"><h1>Start designing here.</h1><p>Enter a prompt to generate your website.</p></main>
+<script src="script.js"></script>
+</body></html>""",
+    "style.css": """body{margin:0;font-family:Arial,sans-serif}
+.hero{min-height:100vh;display:grid;place-content:center;padding:32px;background:#f5efe8;text-align:center}
+h1{font-size:48px;margin:0 0 12px}p{color:#6d625a}""",
     "script.js": "// JavaScript goes here\n",
 }
 
+# ════════════════════════════════════════════════════════════════════
+#  STYLESHEET  (~Design Arena palette & layout)
+# ════════════════════════════════════════════════════════════════════
 
-# ============================================================
-# CSS STYLES
-# ============================================================
-
-ARENA_CSS = """
+ARENA_CSS = r"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
-
-:root {
-    --bg-main: #fcfcfb;
-    --bg-sidebar: #f5f4f1;
-    --bg-panel: #ffffff;
-    --border-color: #e6e4df;
-    --text-main: #2d2d2d;
-    --text-muted: #76746f;
-    --accent-teal: #a5c3b8;
-    --accent-teal-hover: #8eb1a4;
-    --accent-teal-dark: #6b9485;
-    --brand-text: #1a1a1a;
-    --font-sans: 'Inter', sans-serif;
-    --font-serif: 'Playfair Display', serif;
-}
-
-* { box-sizing: border-box; }
-
-body, html {
-    margin: 0; padding: 0; height: 100vh; width: 100vw;
-    background: var(--bg-main);
-    color: var(--text-main);
-    font-family: var(--font-sans);
-    overflow: hidden;
-}
-
-.nicegui-content {
-    padding: 0 !important;
-    max-width: none !important;
-    height: 100vh !important;
-    width: 100vw !important;
-}
-
-.q-page-container { padding: 0 !important; }
-
-/* =========== LAYOUT =========== */
-.arena-root {
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-    gap: 0 !important;
-}
-
-/* =========== SIDEBAR =========== */
-.a-sidebar {
-    width: 240px;
-    height: 100%;
-    background: var(--bg-sidebar);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    gap: 0 !important;
-}
-
-.a-sidebar-header {
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 18px;
-    flex-shrink: 0;
-}
-
-.a-logo {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: linear-gradient(135deg, #d4d0c4, #a5c3b8);
-    display: flex; align-items: center; justify-content: center;
-    color: #333; font-size: 16px; font-weight: 700;
-}
-
-.a-nav {
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex-shrink: 0;
-}
-
-.a-nav-btn {
-    width: 100% !important;
-    justify-content: flex-start !important;
-    padding: 10px 12px !important;
-    color: var(--text-main) !important;
-    font-weight: 500 !important;
-    font-size: 13.5px !important;
-    border-radius: 8px !important;
-    text-transform: none !important;
-    min-height: 38px !important;
-    background: transparent !important;
-    box-shadow: none !important;
-}
-
-.a-nav-btn:hover { background: #eae8e3 !important; }
-
-.a-nav-btn .q-btn__content {
-    justify-content: flex-start !important;
-    gap: 12px !important;
-    flex-wrap: nowrap !important;
-}
-
-.a-nav-btn .q-icon {
-    color: #555 !important;
-    font-size: 18px !important;
-}
-
-.a-recent {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 10px;
-    min-height: 0;
-}
-
-.a-recent::-webkit-scrollbar { width: 6px; }
-.a-recent::-webkit-scrollbar-thumb { background: #d0cec9; border-radius: 3px; }
-
-.a-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    padding: 8px 12px 10px;
-}
-
-.a-recent-item {
-    font-size: 13px;
-    color: var(--text-muted);
-    padding: 7px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.a-recent-item:hover {
-    background: #eae8e3;
-    color: var(--text-main);
-}
-
-.a-recent-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #a5c3b8; flex-shrink: 0;
-}
-
-.a-recent-dot.gray { background: #b8b6b0; }
-
-.a-user {
-    padding: 14px 16px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.a-avatar {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: #4f46e5; color: white;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: 13px;
-}
-
-/* =========== MAIN AREA =========== */
-.a-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-width: 0;
-    gap: 0 !important;
-}
-
-.a-topnav {
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid transparent;
-}
-
-.a-brand-title {
-    font-family: var(--font-serif);
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--brand-text);
-}
-
-.a-brand-sub {
-    font-family: var(--font-sans);
-    font-size: 13px;
-    color: var(--text-muted);
-    font-weight: 400;
-    margin-left: 6px;
-}
-
-.a-top-links {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-}
-
-.a-top-link {
-    color: var(--text-main) !important;
-    font-size: 13.5px !important;
-    font-weight: 500 !important;
-    text-transform: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    min-height: auto !important;
-}
-
-/* =========== HOME SCREEN =========== */
-.a-home {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0 24px 12vh;
-    gap: 0 !important;
-}
-
-.a-hero-title {
-    font-family: var(--font-serif);
-    font-size: 46px;
-    font-weight: 400;
-    margin: 0 0 12px 0;
-    color: var(--brand-text);
-    text-align: center;
-}
-
-.a-hero-sub {
-    color: var(--text-muted);
-    font-size: 14px;
-    margin-bottom: 36px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.a-hero-sub-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-weight: 600;
-    color: var(--text-main);
-}
-
-.a-prompt-box {
-    width: 100%;
-    max-width: 820px;
-    background: white;
-    border: 2px solid #c0d3cc;
-    border-radius: 18px;
-    padding: 20px 22px 16px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.03);
-    transition: all 0.2s;
-}
-
-.a-prompt-box:focus-within {
-    border-color: var(--accent-teal-dark);
-    box-shadow: 0 8px 30px rgba(107, 148, 133, 0.15);
-}
-
-.a-prompt-input .q-field__control {
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    min-height: 140px !important;
-}
-
-.a-prompt-input .q-field__control:before,
-.a-prompt-input .q-field__control:after { display: none !important; }
-
-.a-prompt-input textarea {
-    padding: 0 !important;
-    font-size: 15.5px !important;
-    line-height: 1.55 !important;
-    color: var(--text-main) !important;
-    font-family: var(--font-sans) !important;
-    resize: none !important;
-    min-height: 130px !important;
-    border: 0 !important;
-    outline: none !important;
-    background: transparent !important;
-}
-
-.a-prompt-input textarea::placeholder {
-    color: #a8a6a1 !important;
-}
-
-.a-prompt-tools {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 8px;
-    gap: 8px;
-}
-
-.a-tool-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.a-tool-icon-btn {
-    background: transparent !important;
-    color: #666 !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 50% !important;
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    padding: 0 !important;
-}
-
-.a-tool-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 12px;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    font-size: 13px;
-    color: var(--text-main);
-    font-weight: 500;
-    cursor: pointer;
-    user-select: none;
-}
-
-.a-tool-chip:hover { background: #f9f8f5; }
-
-.a-tool-chip-active {
-    color: var(--accent-teal-dark);
-    border-color: transparent;
-    background: transparent;
-    font-weight: 600;
-}
-
-.a-send-btn {
-    background: var(--accent-teal) !important;
-    color: white !important;
-    border-radius: 50% !important;
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
-    min-height: 42px !important;
-    box-shadow: 0 4px 12px rgba(165, 195, 184, 0.4) !important;
-    transition: all 0.2s !important;
-}
-
-.a-send-btn:hover {
-    background: var(--accent-teal-hover) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(165, 195, 184, 0.5) !important;
-}
-
-/* =========== ARENA SCREEN =========== */
-.a-arena {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    min-height: 0;
-    gap: 0 !important;
-}
-
-.a-chat-panel {
-    width: 400px;
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-main);
-    flex-shrink: 0;
-    gap: 0 !important;
-}
-
-.a-play-banner {
-    height: 48px;
-    background: #f0f5f2;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    color: var(--accent-teal-dark);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.a-chat-history {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    min-height: 0;
-}
-
-.a-chat-history::-webkit-scrollbar { width: 6px; }
-.a-chat-history::-webkit-scrollbar-thumb { background: #d0cec9; border-radius: 3px; }
-
-.a-msg-user {
-    background: #f0efec;
-    padding: 14px 16px;
-    border-radius: 14px;
-    font-size: 14px;
-    line-height: 1.55;
-    color: var(--text-main);
-    max-width: 100%;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-.a-msg-card {
-    background: white;
-    border: 1px solid #d5e1dc;
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-}
-
-.a-option-tabs {
-    display: flex;
-    background: #f5f4f1;
-    border-radius: 22px;
-    padding: 4px;
-    margin-bottom: 14px;
-}
-
-.a-opt-tab {
-    flex: 1;
-    text-align: center;
-    padding: 8px 12px;
-    border-radius: 18px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    color: var(--text-muted);
-    transition: all 0.2s;
-    user-select: none;
-}
-
-.a-opt-tab.active {
-    background: white;
-    color: var(--text-main);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    font-weight: 600;
-}
-
-.a-artifact-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 0;
-    color: var(--accent-teal-dark);
-    font-size: 13px;
-    font-weight: 500;
-}
-
-.a-artifact-timer {
-    color: var(--text-muted);
-    font-size: 12px;
-    font-weight: 400;
-}
-
-.a-agent-status-line {
-    color: var(--text-muted);
-    font-size: 12.5px;
-    margin-top: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.a-using-tool {
-    padding: 10px 14px;
-    color: var(--text-muted);
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-}
-
-.a-chat-input-wrap {
-    padding: 14px;
-    border-top: 1px solid var(--border-color);
-    background: white;
-    flex-shrink: 0;
-}
-
-.a-chat-input-box {
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 10px 12px;
-    background: white;
-}
-
-.a-chat-input-box textarea {
-    border: 0 !important;
-    outline: none !important;
-    resize: none !important;
-    width: 100% !important;
-    min-height: 32px !important;
-    font-size: 13.5px !important;
-    color: var(--text-main) !important;
-    background: transparent !important;
-    padding: 4px 0 !important;
-    font-family: var(--font-sans) !important;
-}
-
-.a-chat-input-tools {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 6px;
-}
-
-/* =========== PREVIEW PANEL =========== */
-.a-preview-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-main);
-    min-width: 0;
-    gap: 0 !important;
-}
-
-.a-preview-tabs {
-    display: flex;
-    background: var(--bg-sidebar);
-    padding: 8px 20px 0;
-    gap: 4px;
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.a-preview-tab {
-    padding: 12px 20px;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: 10px 10px 0 0;
-    background: transparent;
-    border: 1px solid transparent;
-    border-bottom: none;
-    transition: all 0.2s;
-    user-select: none;
-    margin-bottom: -1px;
-}
-
-.a-preview-tab.active {
-    color: var(--brand-text);
-    background: white;
-    border-color: var(--border-color);
-}
-
-.a-preview-tab-icon {
-    font-size: 16px;
-    color: #b8b6b0;
-}
-
-.a-preview-tab.active .a-preview-tab-icon {
-    color: var(--accent-teal-dark);
-}
-
-.a-preview-toolbar {
-    height: 56px;
-    background: white;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.a-mode-toggle {
-    display: flex;
-    background: #f5f4f1;
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-}
-
-.a-mode-btn {
-    width: 36px !important;
-    height: 30px !important;
-    min-width: 36px !important;
-    min-height: 30px !important;
-    border-radius: 6px !important;
-    background: transparent !important;
-    color: var(--text-muted) !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-}
-
-.a-mode-btn.active {
-    background: white !important;
-    color: var(--text-main) !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
-}
-
-.a-url-bar {
-    flex: 1;
-    background: #f5f4f1;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 13px;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-}
-
-.a-url-bar .material-icons {
-    font-size: 16px;
-    color: #b8b6b0;
-}
-
-.a-toolbar-btn {
-    background: transparent !important;
-    color: var(--text-muted) !important;
-    border: none !important;
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    border-radius: 6px !important;
-}
-
-.a-toolbar-btn:hover { background: #f5f4f1 !important; }
-
-.a-publish-btn {
-    background: white !important;
-    color: var(--text-main) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 7px !important;
-    padding: 0 14px !important;
-    min-height: 34px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    text-transform: none !important;
-    box-shadow: none !important;
-}
-
-.a-publish-btn:hover { background: #f5f4f1 !important; }
-
-.a-publish-btn.ready {
-    background: var(--accent-teal) !important;
-    color: white !important;
-    border-color: var(--accent-teal) !important;
-}
-
-.a-preview-body {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    background: white;
-    min-height: 0;
-}
-
-.a-preview-iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    display: block;
-}
-
-.a-code-view {
-    width: 100%;
-    height: 100%;
-    background: #1e1e2e;
-    overflow: auto;
-    padding: 0;
-    display: none;
-}
-
-.a-code-view.visible { display: block; }
-.a-preview-iframe-wrap.hidden { display: none; }
-
-.a-code-view pre {
-    margin: 0;
-    padding: 20px 24px;
-    color: #cdd6f4;
-    font-family: 'JetBrains Mono', Consolas, monospace;
-    font-size: 13px;
-    line-height: 1.7;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-.a-code-view .code-file-label {
-    background: #313244;
-    color: #a6e3a1;
-    padding: 8px 24px;
-    font-family: 'JetBrains Mono', Consolas, monospace;
-    font-size: 12px;
-    font-weight: 600;
-    border-top: 1px solid #45475a;
-    border-bottom: 1px solid #45475a;
-    margin-top: 12px;
-}
-
-.a-code-view .code-file-label:first-child { margin-top: 0; border-top: none; }
-
-/* Loading Overlay */
-.a-loading {
-    position: absolute;
-    inset: 0;
-    background: var(--bg-main);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    gap: 0;
-}
-
-.a-globe {
-    width: 100px;
-    height: 100px;
-    background: #eef4f1;
-    border-radius: 50%;
-    border: 2px solid var(--accent-teal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-}
-
-.a-globe .material-icons {
-    font-size: 48px;
-    color: var(--accent-teal-dark);
-}
-
-.a-load-title {
-    font-family: var(--font-serif);
-    font-size: 28px;
-    color: var(--brand-text);
-    margin-bottom: 8px;
-    font-weight: 600;
-}
-
-.a-load-sub {
-    font-size: 14px;
-    color: var(--text-muted);
-    margin-bottom: 20px;
-}
-
-.a-dots {
-    display: flex;
-    gap: 8px;
-}
-
-.a-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #c0d3cc;
-    animation: a-bounce 1.4s infinite ease-in-out both;
-}
-
-.a-dot:nth-child(1) { animation-delay: -0.32s; }
-.a-dot:nth-child(2) { animation-delay: -0.16s; }
-
-@keyframes a-bounce {
-    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-    40% { transform: scale(1); opacity: 1; background: var(--accent-teal-dark); }
-}
-
-/* Toast Notification */
-.a-toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 14px 18px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    z-index: 1000;
-    max-width: 320px;
-}
-
-.a-toast-check {
-    width: 24px; height: 24px; border-radius: 6px;
-    background: #d1e7d0; color: #2d6f2d;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-}
-
-.a-toast-title { font-weight: 600; font-size: 13px; color: var(--text-main); }
-.a-toast-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-
-/* Responsive */
-@media (max-width: 900px) {
-    .a-sidebar { width: 200px; }
-    .a-chat-panel { width: 340px; }
-    .a-hero-title { font-size: 32px; }
-}
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+:root{
+  --bg-main:#fcfcfb;--bg-sidebar:#f5f4f1;--bg-panel:#fff;
+  --border:#e6e4df;--text-main:#2d2d2d;--text-muted:#76746f;
+  --accent-teal:#a5c3b8;--accent-hover:#8eb1a4;--accent-dark:#6b9485;
+  --brand:#1a1a1a;--sans:'Inter',serif;--serif:'Playfair Display',serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;width:100%}
+body{background:var(--bg-main);color:var(--text-main);font-family:var(--sans);overflow:hidden}
+.nicegui-content,.q-page{padding:0!important;max-width:none!important;height:100%!important;width:100%!important}
+
+/* ── Root layout ── */
+.a-root{display:flex;width:100vw;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.a-sb{width:240px;height:100%;background:var(--bg-sidebar);border-right:1px solid var(--border);
+      display:flex;flex-direction:column;flex-shrink:0}
+.a-sb-head{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 18px}
+.a-logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#d4d0c4,var(--accent-teal));
+        display:flex;align-items:center;justify-content:center;color:#333;font-weight:700;font-size:16px}
+.a-nav{padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.a-nav-btn{width:100%;justify-content:flex-start!important;padding:10px 12px!important;
+           color:var(--text-main)!important;font-weight:500!important;font-size:13.5px!important;
+           border-radius:8px!important;text-transform:none!important;min-height:38px!important;
+           background:transparent!important;box-shadow:none!important}
+.a-nav-btn:hover{background:#eae8e3!important}
+.a-recent{flex:1;overflow-y:auto;padding:12px 10px;min-height:0}
+.a-recent::-webkit-scrollbar{width:6px}.a-recent::-webkit-scrollbar-thumb{background:#d0cec9;border-radius:3px}
+.a-sect-title{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+               letter-spacing:1px;padding:8px 12px 10px}
+.a-rec-item{font-size:13px;color:var(--text-muted);padding:7px 12px;border-radius:6px;cursor:pointer;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.a-rec-item:hover{background:#eae8e3;color:var(--text-main)}
+.a-dot{width:6px;height:6px;border-radius:50%;background:var(--accent-teal);flex-shrink:0}
+.a-user{padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer}
+.a-avatar{width:30px;height:30px;border-radius:50%;background:#4f46e5;color:#fff;
+          display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+
+/* ── Main ── */
+.a-main{flex:1;display:flex;flex-direction:column;height:100%;min-width:0}
+.a-topbar{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.brand-text{font-family:var(--serif);font-size:22px;font-weight:600;color:var(--brand)}
+.brand-sub{font-family:var(--sans);font-size:13px;color:var(--text-muted);margin-left:6px}
+.top-link{color:var(--text-main)!important;font-size:13.5px!important;font-weight:500!important;text-transform:none!important;
+          background:transparent!important;box-shadow:none!important;padding:0!important}
+
+/* ── HOME ── */
+.a-home{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px 12vh}
+.home-title{font-family:var(--serif);font-size:46px;font-weight:400;margin:0 0 12px;color:var(--brand);text-align:center}
+.home-sub{color:var(--text-muted);font-size:14px;margin-bottom:36px;display:flex;align-items:center;gap:6px}
+.home-brand{display:inline-flex;align-items:center;gap:4px;font-weight:600;color:var(--text-main)}
+.prompt-box{width:100%;max-width:820px;background:#fff;border:2px solid #c0d3cc;border-radius:18px;
+            padding:20px 22px 16px;box-shadow:0 8px 30px rgba(0,0,0,.03);transition:.2s}
+.prompt-box:focus-within{border-color:var(--accent-dark);box-shadow:0 8px 30px rgba(107,148,133,.15)}
+.prompt-input .q-field__control{background:transparent!important;border:none!important;padding:0!important;min-height:140px!important}
+.prompt-input .q-field__control:before,.prompt-input .q-field__control:after{display:none!important}
+.prompt-input textarea{padding:0!important;font-size:15.5px!important;line-height:1.55!important;
+                      color:var(--text-main)!important;font-family:var(--sans)!important;
+                      resize:none!important;min-height:130px!important;border:0!important;outline:0!important;background:transparent!important}
+.prompt-input textarea::placeholder{color:#a8a6a1!important}
+.prompt-tools{display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:8px}
+.tool-grp{display:flex;align-items:center;gap:8px}
+.tool-btn{background:transparent!important;color:#666!important;border:1px solid var(--border)!important;
+          border-radius:50%!important;width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;padding:0!important}
+.tool-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:#fff;
+          border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--text-main);
+          font-weight:500;cursor:pointer}.tool-chip:hover{background:#f9f8f5}
+.tool-chip-on{color:var(--accent-dark);border-color:transparent;background:transparent;font-weight:600}
+.send-btn{background:var(--accent-teal)!important;color:#fff!important;border-radius:50%!important;
+         width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+         box-shadow:0 4px 12px rgba(165,195,184,.4)!important;transition:.2s!important}
+.send-btn:hover{background:var(--accent-hover)!important;transform:translateY(-2px);
+                box-shadow:0 6px 16px rgba(165,195,184,.5)!important}
+
+/* ── ARENA ── */
+.a-arena{flex:1;display:flex;overflow:hidden;min-height:0}
+
+/* Chat panel */
+.a-chat{width:400px;border-right:1px solid var(--border);display:flex;flex-direction:column;
+         background:var(--bg-main);flex-shrink:0}
+.play-banner{height:48px;background:#f0f5f2;border-bottom:1px solid var(--border);
+             display:flex;align-items:center;justify-content:center;gap:10px;
+             color:var(--accent-dark);font-size:13px;font-weight:500;cursor:pointer}
+.chat-scroll{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px;min-height:0}
+.chat-scroll::-webkit-scrollbar{width:6px}.chat-scroll::-webkit-scrollbar-thumb{background:#d0cec9;border-radius:3px}
+.msg-user{background:#f0efec;padding:14px 16px;border-radius:14px;font-size:14px;line-height:1.55;max-width:100%;
+         white-space:pre-wrap;word-wrap:break-word}
+.msg-card{background:#fff;border:1px solid #d5e1dc;border-radius:16px;padding:18px;
+          box-shadow:0 4px 20px rgba(0,0,0,.02)}
+.opt-tabs{display:flex;background:#f5f4f1;border-radius:22px;padding:4px;margin-bottom:14px}
+.opt-tab{flex:1;text-align:center;padding:8px 12px;border-radius:18px;font-size:13px;font-weight:500;
+         cursor:pointer;color:var(--text-muted);transition:.2s;user-select:none}
+.opt-tab.on{background:#fff;color:var(--text-main);box-shadow:0 2px 6px rgba(0,0,0,.06);font-weight:600}
+.art-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;color:var(--accent-dark);font-size:13px;font-weight:500}
+.art-timer{color:var(--text-muted);font-size:12px;font-weight:400}
+.agent-line{color:var(--text-muted);font-size:12.5px;margin-top:6px;display:flex;align-items:center;gap:6px}
+.using-tool{padding:10px 14px;color:var(--text-muted);font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.chat-input-w{padding:14px;border-top:1px solid var(--border);background:#fff}
+.chat-ibox{border:1px solid var(--border);border-radius:14px;padding:10px 12px;background:#fff}
+.chat-ibox textarea{border:0!important;outline:0!important;resize:none!important;width:100%!important;min-height:32px!important;
+                    font-size:13.5px!important;color:var(--text-main)!important;background:transparent!important;padding:4px 0!important;font-family:var(--sans)!important}
+.chat-itools{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.chat-send-sm{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important}
+
+/* Preview panel */
+.a-prev{flex:1;display:flex;flex-direction:column;background:var(--bg-main);min-width:0}
+.prev-tabs{display:flex;background:var(--bg-sidebar);padding:8px 20px 0;gap:4px;flex-shrink:0;
+           border-bottom:1px solid var(--border)}
+.prev-tab{padding:12px 20px;font-weight:600;font-size:14px;color:var(--text-muted);cursor:pointer;
+          display:flex;align-items:center;gap:8px;border-radius:10px 10px 0 0;
+          background:transparent;border:1px solid transparent;border-bottom:none;transition:.2s;user-select:none;margin-bottom:-1px}
+.prev-tab.on{color:var(--brand);background:#fff;border-color:var(--border)}
+.prev-ticon{font-size:16px;color:#b8b6b0}.prev-tab.on .prev-ticon{color:var(--accent-dark)}
+
+.prev-toolbar{height:56px;background:#fff;border-bottom:1px solid var(--border);
+             display:flex;align-items:center;padding:0 16px;gap:8px;flex-shrink:0}
+.mode-tog{display:flex;background:#f5f4f1;border-radius:8px;padding:3px;gap:2px}
+.mode-btn{width:36px!important;height:30px!important;min-width:36px!important;min-height:30px!important;
+          border-radius:6px!important;background:transparent!important;color:var(--text-muted)!important;
+          padding:0!important;box-shadow:none!important}
+.mode-btn.on{background:#fff!important;color:var(--text-main)!important;box-shadow:0 1px 4px rgba(0,0,0,.08)!important}
+.url-bar{flex:1;background:#f5f4f1;border:1px solid var(--border);border-radius:8px;
+         padding:8px 14px;font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;min-height:36px}
+.tbar-btn{background:transparent!important;color:var(--text-muted)!important;border:none!important;
+          width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;border-radius:6px!important}
+.tbar-btn:hover{background:#f5f4f1!important}
+.pub-btn{background:#fff!important;color:var(--text-main)!important;border:1px solid var(--border)!important;
+         border-radius:7px!important;padding:0 14px!important;min-height:34px!important;
+         font-size:13px!important;font-weight:600!important;text-transform:none!important;box-shadow:none!important}
+.pub-btn:hover{background:#f5f4f1!important}
+.pub-btn.ready{background:var(--accent-teal)!important;color:#fff!important;border-color:var(--accent-teal)!important}
+
+.prev-body{flex:1;position:relative;overflow:hidden;background:#fff;min-height:0}
+.ifr-wrap{width:100%;height:100%}.ifr-wrap>iframe{width:100%;height:100%;border:none;display:block}
+.code-view{width:100%;height:100%;background:#1e1e2e;overflow:auto;padding:0;display:none}
+.code-view.show{display:block}
+.code-view pre{margin:0;padding:20px 24px;color:#cdd6f4;font-family:'JetBrains Mono',Consolas,monospace;
+              font-size:13px;line-height:1.7;white-space:pre-wrap;word-wrap:break-word}
+.code-flabel{background:#313244;color:#a6e3a1;padding:8px 24px;
+             font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;font-weight:600;
+             border-top:1px solid #45475a;border-bottom:1px solid #45475a;margin-top:12px}
+.code-flabel:first-child{margin-top:0;border-top:none}
+
+/* Loading overlay */
+.load-overlay{position:absolute;inset:0;background:var(--bg-main);
+              display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;gap:0}
+.globe{width:100px;height:100px;background:#eef4f1;border-radius:50%;border:2px solid var(--accent-teal);
+       display:flex;align-items:center;justify-content:center;margin-bottom:24px}
+.globe .material-icons{font-size:48px;color:var(--accent-dark)}
+.load-title{font-family:var(--serif);font-size:28px;color:var(--brand);margin-bottom:8px;font-weight:600}
+.load-sub{font-size:14px;color:var(--text-muted);margin-bottom:20px}
+.dots{display:flex;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%;background:#c0d3cc;
+     animation:bounce 1.4s infinite ease-in-out both}
+.dot:nth-child(1){animation-delay:-.32s}.dot:nth-child(2){animation-delay:-.16s}
+@keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1;background:var(--accent-dark)}}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:#fff;border:1px solid var(--border);
+       border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;
+       box-shadow:0 8px 24px rgba(0,0,0,.08);z-index:9999;max-width:320px}
+.toast-ok{width:24px;height:24px;border-radius:6px;background:#d1e7d0;color:#2d6f2d;
+          display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast-tit{font-weight:600;font-size:13px;color:var(--text-main)}.toast-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+
+@media(max-width:900px){.a-sb{width:200px}.a-chat{width:340px}.home-title{font-size:32px}}
 </style>
 """
 
+# ════════════════════════════════════════════════════════════════════
+#  HELPERS
+# ════════════════════════════════════════════════════════════════════
 
-# ============================================================
-# HELPERS
-# ============================================================
 
-def _project_document(files: dict[str, str]) -> str:
-    """Combine HTML, CSS, JS into a single self-contained doc."""
-    react_code = files.get("src/App.jsx") or files.get("src/App.js")
-    if react_code:
+def _combine_document(files: dict[str, str]) -> str:
+    """Inline CSS + JS into HTML so iframe preview is self-contained."""
+    # React mode?
+    react = files.get("src/App.jsx") or files.get("src/App.js")
+    if react:
         css = files.get("src/styles.css", "") + files.get("src/App.css", "")
-        react_code = re.sub(r"^\s*import\s+.*?;\s*$", "", react_code, flags=re.MULTILINE)
-        react_code = re.sub(r"\bexport\s+default\s+", "", react_code)
-        return f"""<!doctype html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<style>{css}</style></head><body><div id="root"></div>
-<script type="text/babel">{react_code}
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
-</script></body></html>"""
-    index = files.get("index.html", "<h1>Waiting for content...</h1>")
+        react = re.sub(r"^\s*import\s+.*?;\s*$", "", react, flags=re.M)
+        react = re.sub(r"\bexport\s+default\s+", "", react)
+        return (
+            "<!doctype html><html><head><meta charset=UTF-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+            f"<script crossorigin src=https://unpkg.com/react@18/umd/react.development.js></script>"
+            f"<script crossorigin src=https://unpkg.com/react-dom@18/umd/react-dom.development.js></script>"
+            f"<script src=https://unpkg.com/@babel/standalone/babel.min.js></script>"
+            f"<style>{css}</style></head><body><div id=root></div>"
+            f"<script type=text/babel>{react}\nconst root=ReactDOM.createRoot(document.getElementById('root'));root.render(<App/>);"
+            "</script></body></html>"
+        )
+
+    idx = files.get("index.html", "<h1>Waiting…</h1>")
     css = files.get("style.css", "")
     js = files.get("script.js", "")
-    index = re.sub(
+
+    idx = re.sub(
         r'<link[^>]+href=["\']style\.css["\'][^>]*>',
-        f"<style>{css}</style>",
-        index,
-        flags=re.IGNORECASE,
+        f"<style>{css}</style>", idx, flags=re.I,
     )
-    index = re.sub(
+    idx = re.sub(
         r'<script[^>]+src=["\']script\.js["\'][^>]*></script>',
-        f"<script>{js}</script>",
-        index,
-        flags=re.IGNORECASE,
+        f"<script>{js}</script>", idx, flags=re.I,
     )
-    return index
+    return idx
 
 
-def _parse_generated_files(response: str) -> dict[str, str]:
-    """Extract file blocks from LLM response."""
-    pattern = re.compile(
+def _parse_files(raw: str) -> dict[str, str]:
+    """Extract ### FILE: … \n``` … ``` blocks."""
+    pat = re.compile(
         r"###\s*FILE:\s*([^\n]+)\n```[^\n]*\n(.*?)```",
-        re.IGNORECASE | re.DOTALL,
+        re.I | re.S,
     )
-    files = {}
-    for path, content in pattern.findall(response):
-        normalized = path.strip().replace("\\", "/")
-        if normalized in {
-            "index.html", "style.css", "script.js", "package.json",
-            "src/App.jsx", "src/App.js", "src/styles.css", "src/App.css",
-        }:
-            files[normalized] = content.strip() + "\n"
-    return files
+    out: dict[str, str] = {}
+    allowed = {
+        "index.html", "style.css", "script.js", "package.json",
+        "src/App.jsx", "src/App.js", "src/styles.css", "src/App.css",
+    }
+    for path, content in pat.findall(raw):
+        p = path.strip().replace("\\", "/")
+        if p in allowed:
+            out[p] = content.strip() + "\n"
+    return out
 
 
-def _project_title(prompt: str) -> str:
+def _title_from_prompt(prompt: str) -> str:
     words = re.findall(r"[A-Za-z0-9]+", prompt)
-    return " ".join(words[:6]).strip().title() or "Website Project"
+    return (" ".join(words[:6]).strip().title()) or "Website Project"
 
 
-def _build_project_zip(files: dict[str, str]) -> bytes:
-    archive = io.BytesIO()
-    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as project_zip:
+def _make_zip(files: dict[str, str]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for path, content in sorted(files.items()):
-            project_zip.writestr(path, content)
-    return archive.getvalue()
+            z.writestr(path, content)
+    return buf.getvalue()
 
 
-def _publication_slug(project_id: int, name: str) -> str:
+def _slug(project_id: int, name: str) -> string:
     base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "website"
     return f"{base}-{project_id}"
 
 
-@ui.page("/published/{slug}")
-def published_page(slug: str) -> None:
-    publication = db.get_publication_by_slug(slug)
-    if not publication:
-        ui.label("Published website not found").classes("text-h4 q-pa-xl")
-        return
-    files = {
-        item["path"]: item["content"]
-        for item in db.get_project_files(publication["project_id"])
-    }
-    ui.add_head_html("<style>html,body,#q-app{margin:0;width:100%;height:100%;overflow:hidden}</style>")
-    ui.html(
-        '<iframe title="Published website" style="border:0;width:100%;height:100vh" '
-        f'srcdoc="{html.escape(_project_document(files), quote=True)}"></iframe>'
-    )
-
-
-def _render_code_view(files: dict[str, str], selected_file: str | None = None) -> str:
-    """Render files as HTML for the code view."""
+def _code_view_html(files: dict[str, str], sel: str | None = None) -> str:
     if not files:
-        return '<pre>Waiting for code generation...</pre>'
-    filename = selected_file if selected_file in files else sorted(files)[0]
+        return "<pre>No code yet.</pre>"
+    fn = sel if sel in files else sorted(files)[0]
     return (
-        f'<div class="code-file-label">{html.escape(filename)}</div>'
-        f'<pre><code>{html.escape(files[filename])}</code></pre>'
+        f'<div class="code-flabel">{html_mod.escape(fn)}</div>'
+        f'<pre><code>{html_mod.escape(files[fn])}</code></pre>'
     )
 
 
-# ============================================================
-# PAGE
-# ============================================================
+# ════════════════════════════════════════════════════════════════════
+#  PUBLISHED PAGE ROUTE
+# ════════════════════════════════════════════════════════════════════
+
+
+@ui.page("/published/{slug}")
+def published_page(slug: str):
+    pub = db.get_publication_by_slug(slug)
+    if not pub:
+        ui.label("Not found").classes("text-h4 q-pa-xl")
+        return
+    rows = db.get_project_files(pub["project_id"])
+    files = {r["path"]: r["content"] for r in rows}
+    doc = html_mod.escape(_combine_document(files), quote=True)
+    ui.add_head_html("<style>html,body,#q-app{margin:0;width:100%;height:100%;overflow:hidden}</style>")
+    ui.html(f'<iframe style="border:0;width:100%;height:100vh" srcdoc="{doc}"></iframe>')
+
+
+# ════════════════════════════════════════════════════════════════════
+#  BUILDER PAGE
+# ════════════════════════════════════════════════════════════════════
+
 
 @ui.page("/builder")
-def builder_page() -> None:
+def builder_page():
     ui.add_head_html(ARENA_CSS)
 
-    # Load or create initial project
+    # ---- seed DB if empty ----
     projects = db.get_all_projects()
     if not projects:
         pid = db.create_project()
@@ -1001,507 +340,388 @@ def builder_page() -> None:
             db.save_project_file(pid, p, c)
         projects = db.get_all_projects()
 
-    # ========================================
-    # STATE
-    # ========================================
-    state = {
-        "view": "home",              # 'home' or 'arena'
-        "status": "idle",            # 'idle', 'generating', 'ready'
-        "active_option": "A",        # 'A' or 'B'
-        "display_mode": "preview",   # 'preview' or 'code'
+    # ═══ STATE ═══
+    st = {
+        "view": "home",
+        "status": "idle",
+        "opt": "A",
+        "mode": "preview",
         "prompt": "",
         "code_A": {},
         "code_B": {},
         "voted": False,
-        "published_url_A": "",
-        "published_url_B": "",
-        "project_id_A": None,
-        "project_id_B": None,
-        "selected_file": "index.html",
+        "url_A": "",
+        "url_B": "",
+        "pid_A": None,
+        "pid_B": None,
+        "sel_file": "index.html",
     }
+    r: dict = {}  # element refs
 
-    # UI element refs (populated during build)
-    refs = {}
+    # ═══ LOGIC ═══
 
-    # ========================================
-    # LOGIC
-    # ========================================
-
-    def update_viewer():
-        """Update iframe & code view based on active option."""
-        active_code = state["code_A"] if state["active_option"] == "A" else state["code_B"]
-
-        # Iframe
-        if refs.get("preview_iframe"):
-            doc_html = html.escape(_project_document(active_code), quote=True)
-            refs["preview_iframe"].set_content(
-                f'<iframe class="a-preview-iframe" sandbox="allow-scripts" srcdoc="{doc_html}"></iframe>'
+    def _refresh_viewer():
+        code = st["code_A"] if st["opt"] == "A" else st["code_B"]
+        # iframe
+        if r.get("ifr_wrap"):
+            doc = html_mod.escape(_combine_document(code), quote=True)
+            r["ifr_wrap"].set_content(
+                f'<iframe sandbox="allow-scripts" srcdoc="{doc}"></iframe>'
             )
-
-        # Code view
-        if refs.get("code_view"):
-            refs["code_view"].set_content(
-                _render_code_view(active_code, state["selected_file"])
-            )
-
-        # URL Bar
-        if refs.get("url_bar"):
-            if state["voted"]:
-                url = state["published_url_A"] if state["active_option"] == "A" else state["published_url_B"]
-                refs["url_bar"].clear()
-                with refs["url_bar"]:
-                    ui.html('<i class="material-icons">public</i>')
-                    ui.label(url if url else f"Click Publish for Option {state['active_option']}")
-            else:
-                refs["url_bar"].clear()
-                with refs["url_bar"]:
-                    ui.html('<i class="material-icons">public</i>')
+        # code view
+        if r.get("cview"):
+            r["cview"].set_content(_code_view_html(code, st["sel_file"]))
+        # url bar
+        if r.get("ubar"):
+            r["ubar"].clear()
+            with r["ubar"]:
+                ui.icon("public", size="16px").classes("text-grey-6")
+                if st["voted"]:
+                    url = st["url_A"] if st["opt"] == "A" else st["url_B"]
+                    ui.label(url or f"Publish Option {st['opt']}")
+                else:
                     ui.label("Vote to get link")
 
-    def toggle_option(opt: str):
-        state["active_option"] = opt
-        active_code = state["code_A"] if opt == "A" else state["code_B"]
-        if active_code and state["selected_file"] not in active_code:
-            state["selected_file"] = sorted(active_code)[0]
-        if refs.get("code_file_select"):
-            refs["code_file_select"].set_options(
-                sorted(active_code), value=state["selected_file"]
-            )
-        # Update left panel tabs
-        if refs.get("opt_A_tab"):
-            refs["opt_A_tab"].classes(add="active" if opt == "A" else "", remove="active" if opt == "B" else "")
-        if refs.get("opt_B_tab"):
-            refs["opt_B_tab"].classes(add="active" if opt == "B" else "", remove="active" if opt == "A" else "")
-        # Update right panel tabs
-        if refs.get("preview_tab_A"):
-            refs["preview_tab_A"].classes(add="active" if opt == "A" else "", remove="active" if opt == "B" else "")
-        if refs.get("preview_tab_B"):
-            refs["preview_tab_B"].classes(add="active" if opt == "B" else "", remove="active" if opt == "A" else "")
-        update_viewer()
+    def _switch_opt(o: str):
+        st["opt"] = o
+        code = st["code_A"] if o == "A" else st["code_B"]
+        if code and st["sel_file"] not in code:
+            st["sel_file"] = sorted(code)[0]
+        # left tabs
+        for k in ("tab_a", "tab_b"):
+            el = r.get(k)
+            if el:
+                el.classes(add="on" if {"tab_a": "A", "tab_b": "B"}[k] == o else "", remove="on" if {"tab_a": "B", "tab_b": "A"}[k] == o else "")
+        # right tabs
+        for k in ("ptab_a", "ptab_b"):
+            el = r.get(k)
+            if el:
+                el.classes(add="on" if {"ptab_a": "A", "ptab_b": "B"}[k] == o else "", remove="on" if {"ptab_a": "B", "ptab_b": "A"}[k] == o else "")
+        # file select
+        if r.get("fsel"):
+            r["fsel"].set_options(sorted(code), value=st["sel_file"])
+        _refresh_viewer()
 
-    def set_display_mode(mode: str):
-        state["display_mode"] = mode
-        if mode == "code":
-            refs["code_view"].classes(add="visible")
-            refs["preview_iframe"].classes(add="hidden")
-            refs["mode_btn_preview"].classes(remove="active")
-            refs["mode_btn_code"].classes(add="active")
+    def _set_mode(m: str):
+        st["mode"] = m
+        if m == "code":
+            r["cview"].classes(add="show")
+            r["ifr_wrap"].classes(add="hidden")
+            r["m_eye"].classes(remove="on"); r["m_code"].classes(add="on")
         else:
-            refs["code_view"].classes(remove="visible")
-            refs["preview_iframe"].classes(remove="hidden")
-            refs["mode_btn_preview"].classes(add="active")
-            refs["mode_btn_code"].classes(remove="active")
+            r["cview"].classes(remove="show")
+            r["ifr_wrap"].classes(remove="hidden")
+            r["m_eye"].classes(add="on"); r["m_code"].classes(remove="on")
 
-    def select_code_file(event):
-        state["selected_file"] = event.value
-        update_viewer()
+    def _pick_file(e):
+        st["sel_file"] = e.value
+        _refresh_viewer()
 
-    def download_active_project():
-        code = state["code_A"] if state["active_option"] == "A" else state["code_B"]
+    def _download():
+        code = st["code_A"] if st["opt"] == "A" else st["code_B"]
         if not code:
-            ui.notify("Generate a website before downloading its code.", type="warning")
-            return
-        filename = re.sub(r"[^A-Za-z0-9._-]+", "-", state["prompt"][:40]).strip("-")
-        ui.download(_build_project_zip(code), f"{filename or 'website-project'}.zip")
-        ui.notify("Project ZIP downloaded.", type="positive")
+            ui.notify("Generate first.", type="warning"); return
+        nm = re.sub(r"[^A-Za-z0-9._-]+", "-", st["prompt"][:40]).strip("-") or "website"
+        ui.download(_make_zip(code), f"{nm}.zip")
+        ui.notify("ZIP downloaded", type="positive")
 
-    def open_published_site():
-        opt = state["active_option"]
-        url = state["published_url_A"] if opt == "A" else state["published_url_B"]
+    def _open_live():
+        url = st["url_A"] if st["opt"] == "A" else st["url_B"]
         if not url:
-            ui.notify("Publish this option first.", type="warning")
-            return
-        ui.run_javascript(f"window.open({json.dumps(url)}, '_blank')")
+            ui.notify("Publish first.", type="warning"); return
+        ui.run_javascript(f"window.open({json.dumps(url)},'_blank')")
 
-    def toggle_fullscreen():
+    def _fullscreen():
         ui.run_javascript(
-            "const el=document.querySelector('.a-preview-body');"
-            "if (document.fullscreenElement) document.exitFullscreen();"
-            "else if (el) el.requestFullscreen();"
+            "const e=document.querySelector('.prev-body');"
+            "if(document.fullscreenElement)document.exitFullscreen();"
+            "else e?.requestFullscreen()"
         )
 
-    def open_saved_project(project_id: int):
-        files = {
-            item["path"]: item["content"] for item in db.get_project_files(project_id)
-        }
-        if not files:
-            ui.notify("This project has no generated files.", type="warning")
-            return
-        project = next((item for item in db.get_all_projects() if item["id"] == project_id), None)
-        state["prompt"] = project["name"] if project else "Saved website"
-        state["status"] = "ready"
-        state["voted"] = True
-        state["active_option"] = "A"
-        state["code_A"] = files
-        state["selected_file"] = sorted(files)[0]
-        publication = db.get_project_publication(project_id)
-        state["published_url_A"] = f"/published/{publication['slug']}" if publication else ""
-        refs["home_container"].set_visibility(False)
-        refs["arena_container"].set_visibility(True)
-        refs["user_msg"].set_text(state["prompt"])
-        update_viewer()
+    def _open_saved(pid: int):
+        rows = db.get_project_files(pid)
+        if not rows:
+            ui.notify("No files.", type="warning"); return
+        proj = next((p for p in db.get_all_projects() if p["id"] == pid), None)
+        st["prompt"] = proj["name"] if proj else "Saved site"
+        st["status"] = "ready"; st["voted"] = True; st["opt"] = "A"
+        st["code_A"] = {row["path"]: row["content"] for row in rows}
+        st["sel_file"] = sorted(st["code_A"])[0]
+        pub = db.get_project_publication(pid)
+        st["url_A"] = f"/published/{pub['slug']}" if pub else ""
+        r["home"].set_visibility(False)
+        r["arena"].set_visibility(True)
+        r["umsg"].set_text(st["prompt"])
+        _refresh_viewer()
 
-    def update_recent_projects():
-        recent = refs.get("recent_projects")
-        if recent is None:
+    def _refresh_recent():
+        rc = r.get("recent")
+        if rc is None:
             return
-        recent.clear()
-        with recent:
-            projects = db.get_all_projects()[:8]
-            if not projects:
-                ui.label("No saved designs yet").classes("text-grey-6 text-sm")
-            for project in projects:
-                with ui.element("div").classes("a-recent-item") as item:
-                    ui.html('<div class="a-recent-dot"></div>')
-                    ui.label(project["name"])
-                item.on("click", lambda _event=None, pid=project["id"]: open_saved_project(pid))
+        rc.clear()
+        with rc:
+            ps = db.get_all_projects()[:8]
+            if not ps:
+                ui.label("No saved designs").classes("text-grey-6 text-sm")
+            for p in ps:
+                with ui.element("div").classes("a-rec-item") as it:
+                    ui.element("div").classes("a-dot")
+                    ui.label(p["name"])
+                it.on("click", lambda _, pid=p["id"]: _open_saved(pid))
 
-    async def generate_option(option_name: str, personality: str):
-        """Generate one version by calling the LLM."""
+    async def _gen_one(name: str, style: str):
         try:
             from app.main import stream_llm
         except Exception:
-            # Fallback if stream_llm is not available
             await asyncio.sleep(2)
-            fallback = {
-                "index.html": f'<!DOCTYPE html><html><head><title>Option {option_name}</title></head>'
-                              f'<body><h1>Option {option_name}</h1><p>{personality}</p><p>Prompt: {state["prompt"]}</p></body></html>',
-                "style.css": "body { font-family: sans-serif; padding: 40px; background: #f5efe8; }",
-                "script.js": "console.log('Option " + option_name + "');"
+            fb = {
+                "index.html": f"<h1>Option {name}</h1><p>{style}<p>Prompt: {st['prompt']}</p>",
+                "style.css": "body{font-family:sans-serif;padding:40px;background:#f5efe8}",
+                "script.js": f"console.log('{name}')",
             }
-            if option_name == "A":
-                state["code_A"] = fallback
+            (st["code_A"] if name == "A" else st["code_B"]).__dict__.update(fb) if False else None
+            if name == "A":
+                st["code_A"] = fb
             else:
-                state["code_B"] = fallback
+                st["code_B"] = fb
             return
 
-        instruction = (
-            f"You are a Senior Web Developer. Create a high-quality, production-ready single-page website. "
-            f"Design style: {personality}. "
+        instr = (
+            "You are a Senior Web Developer. Create a high-quality, production-ready single-page website.\n"
+            f"Design style: {style}\n"
             "Return ONLY these three code blocks in this exact format, no other text:\n\n"
             "### FILE: index.html\n```html\n<complete HTML>\n```\n\n"
             "### FILE: style.css\n```css\n<complete CSS>\n```\n\n"
             "### FILE: script.js\n```javascript\n<JS code>\n```\n\n"
-            f"User request:\n{state['prompt']}"
+            f"User request:\n{st['prompt']}"
         )
-
+        raw = ""
         try:
-            response = ""
-            async for chunk in stream_llm([{"role": "user", "content": instruction}]):
-                response += chunk
-
-            files = _parse_generated_files(response)
-            if not files or not files.get("index.html"):
-                raise ValueError("No valid HTML generated")
-
-            if option_name == "A":
-                state["code_A"] = files
+            async for chunk in stream_llm([{"role": "user", "content": instr}]):
+                raw += chunk
+            files = _parse_files(raw)
+            if not files or "index.html" not in files:
+                raise ValueError("No HTML generated")
+            if name == "A":
+                st["code_A"] = files
             else:
-                state["code_B"] = files
-        except Exception as e:
+                st["code_B"] = files
+        except Exception as exc:
             fallback = {
-                "index.html": f'<!DOCTYPE html><html><body><h1>Generation Error</h1><p>{html.escape(str(e))}</p></body></html>',
-                "style.css": "body { padding: 40px; font-family: sans-serif; }",
-                "script.js": ""
+                "index.html": f"<h1>Error</h1><pre>{html_mod.escape(str(exc))}</pre>",
+                "style.css": "body{padding:40px}",
+                "script.js": "",
             }
-            if option_name == "A":
-                state["code_A"] = fallback
+            if name == "A":
+                st["code_A"] = fallback
             else:
-                state["code_B"] = fallback
+                st["code_B"] = fallback
 
-    async def submit_prompt():
-        text = refs["prompt_input"].value if refs.get("prompt_input") else ""
-        if not text or not text.strip():
-            ui.notify("Please enter a prompt.", type="warning")
-            return
+    async def _submit():
+        txt = r["inp"].value if r.get("inp") else ""
+        if not txt or not txt.strip():
+            ui.notify("Enter a prompt.", type="warning"); return
+        st["prompt"] = txt.strip()
+        st["status"] = "generating"; st["voted"] = False; st["opt"] = "A"
 
-        state["prompt"] = text.strip()
-        state["status"] = "generating"
-        state["voted"] = False
-        state["active_option"] = "A"
+        r["home"].set_visibility(False); r["arena"].set_visibility(True)
+        r["umsg"].set_text(st["prompt"]); r["load"].set_visibility(True)
 
-        # Swap views
-        refs["home_container"].set_visibility(False)
-        refs["arena_container"].set_visibility(True)
-        refs["user_msg"].set_text(state["prompt"])
-        refs["loading_overlay"].set_visibility(True)
+        _switch_opt("A"); _set_mode("preview")
 
-        # Reset toggles
-        toggle_option("A")
-        set_display_mode("preview")
-
-        # Generate both options in parallel
         await asyncio.gather(
-            generate_option("A", "Clean, minimalist, modern, professional with subtle animations"),
-            generate_option("B", "Bold, creative, vibrant colors, playful with strong visuals"),
+            _gen_one("A", "Clean, minimalist, modern, professional with subtle animations"),
+            _gen_one("B", "Bold, creative, vibrant colors, playful with strong visuals"),
         )
-
-        state["status"] = "ready"
-        active_code = state["code_A"]
-        state["selected_file"] = sorted(active_code)[0] if active_code else "index.html"
-        if refs.get("code_file_select"):
-            refs["code_file_select"].set_options(
-                sorted(active_code), value=state["selected_file"]
-            )
-        refs["loading_overlay"].set_visibility(False)
-        update_viewer()
-
+        st["status"] = "ready"
+        ac = st["code_A"]; st["sel_file"] = sorted(ac)[0] if ac else "index.html"
+        if r.get("fsel"):
+            r["fsel"].set_options(sorted(ac), value=st["sel_file"])
+        r["load"].set_visibility(False)
+        _refresh_viewer()
         ui.notify("✨ Both designs ready! Vote for your favorite.", type="positive", position="bottom-right")
 
-    def cast_vote():
-        """Mark that the user has 'voted' - unlocks publish URL."""
-        if state["status"] != "ready":
-            ui.notify("Wait for generation to finish", type="warning")
-            return
-        state["voted"] = True
-        ui.notify(f"✓ Voted for Option {state['active_option']}!", type="positive")
-        update_viewer()
+    def _vote():
+        if st["status"] != "ready":
+            ui.notify("Wait for generation.", type="warning"); return
+        st["voted"] = True
+        ui.notify(f"✓ Voted Option {st['opt']}!", type="positive")
+        _refresh_viewer()
 
-    def publish_site():
-        if state["status"] != "ready":
-            ui.notify("Wait for generation to complete", type="warning")
-            return
-
-        opt = state["active_option"]
-        code = state["code_A"] if opt == "A" else state["code_B"]
-
-        # Save the selected option and create a stable local publication.
-        project_name = f"Arena {opt}: {state['prompt'][:30]}"
-        existing_pid = state["project_id_A"] if opt == "A" else state["project_id_B"]
-        pid = existing_pid or db.create_project(name=project_name)
-        db.update_project_name(pid, project_name)
+    def _publish():
+        if st["status"] != "ready":
+            ui.notify("Wait for generation.", type="warning"); return
+        opt = st["opt"]
+        code = st["code_A"] if opt == "A" else st["code_B"]
+        pname = f"Arena {opt}: {st['prompt'][:30]}"
+        epid = st["pid_A"] if opt == "A" else st["pid_B"]
+        pid = epid or db.create_project(name=pname)
+        db.update_project_name(pid, pname)
         for p, c in code.items():
             db.save_project_file(pid, p, c)
-
-        slug = _publication_slug(pid, project_name)
+        slug = _slug(pid, pname)
         db.publish_project(pid, slug)
         url = f"/published/{slug}"
-
         if opt == "A":
-            state["published_url_A"] = url
-            state["project_id_A"] = pid
+            st["url_A"] = url; st["pid_A"] = pid
         else:
-            state["published_url_B"] = url
-            state["project_id_B"] = pid
+            st["url_B"] = url; st["pid_B"] = pid
+        st["voted"] = True; _refresh_viewer()
+        ui.notify(f"🚀 Published! {url}", type="positive", position="top")
+        _refresh_recent()
 
-        state["voted"] = True
-        update_viewer()
+    def _go_home():
+        st.update(view="home", status="idle", prompt="", code_A={}, code_B={},
+                  voted=False, url_A="", url_B="", pid_A=None, pid_B=None)
+        if r.get("inp"):
+            r["inp"].value = ""
+        r["home"].set_visibility(True); r["arena"].set_visibility(False)
 
-        ui.notify(f"🚀 Option {opt} Published! {url}", type="positive", position="top")
-        update_recent_projects()
-
-    def go_home():
-        state["view"] = "home"
-        state["status"] = "idle"
-        state["prompt"] = ""
-        state["code_A"] = {}
-        state["code_B"] = {}
-        state["voted"] = False
-        state["published_url_A"] = ""
-        state["published_url_B"] = ""
-        if refs.get("prompt_input"):
-            refs["prompt_input"].value = ""
-        refs["home_container"].set_visibility(True)
-        refs["arena_container"].set_visibility(False)
-
-    def refresh_preview():
-        update_viewer()
-        ui.notify("Preview refreshed", type="info", position="bottom-right")
-
-    def copy_url():
-        opt = state["active_option"]
-        url = state["published_url_A"] if opt == "A" else state["published_url_B"]
+    def _copy_url():
+        url = st["url_A"] if st["opt"] == "A" else st["url_B"]
         if url:
-            ui.run_javascript(
-                f"navigator.clipboard.writeText(new URL({json.dumps(url)}, location.origin).href)"
-            )
+            ui.run_javascript(f"navigator.clipboard.writeText(new URL({json.dumps(url)},location.origin).href)")
             ui.notify("URL copied!", type="positive")
         else:
-            ui.notify("Publish first to get URL", type="warning")
+            ui.notify("Publish first.", type="warning")
 
-    # ============================================================
-    # LAYOUT
-    # ============================================================
-
-    with ui.element("div").classes("arena-root"):
-
-        # --- LEFT SIDEBAR ---
-        with ui.element("div").classes("a-sidebar"):
-            # Header
-            with ui.element("div").classes("a-sidebar-header"):
-                ui.html('<div class="a-logo">✦</div>')
+    # ═══ LAYOUT ═══
+    with ui.element("div").classes("a-root"):
+        # ─── SIDEBAR ───
+        with ui.element("div").classes("a-sb"):
+            with ui.element("div").classes("a-sb-head"):
+                ui.element("div").classes("a-logo"); ui.label("✦").classes("text-white")
                 ui.button(icon="view_sidebar").props("flat dense round").classes("text-grey-7")
-
-            # Nav
             with ui.element("div").classes("a-nav"):
-                ui.button("New project", icon="edit_square", on_click=go_home).props("flat no-caps").classes("a-nav-btn")
+                ui.button("New project", icon="edit_square", on_click=_go_home).props("flat no-caps").classes("a-nav-btn")
                 ui.button("Search", icon="search").props("flat no-caps").classes("a-nav-btn")
                 ui.button("My Projects", icon="folder_open").props("flat no-caps").classes("a-nav-btn")
                 ui.button("Leaderboards", icon="leaderboard").props("flat no-caps").classes("a-nav-btn")
                 ui.button("Models", icon="view_in_ar").props("flat no-caps").classes("a-nav-btn")
                 ui.button("About", icon="info_outline").props("flat no-caps").classes("a-nav-btn")
-
-            # Recent
             with ui.element("div").classes("a-recent"):
-                refs["recent_projects"] = ui.column().classes("w-full gap-0")
-                with refs["recent_projects"]:
-                    ui.label("Loading saved designs...").classes("text-grey-6 text-sm")
-
-            # User
+                ui.label("Recent Designs").classes("a-sect-title")
+                r["recent"] = ui.column().classes("w-full gap-0")
+                with r["recent"]:
+                    ui.label("Loading…").classes("text-grey-6 text-sm")
             with ui.element("div").classes("a-user"):
-                ui.html('<div class="a-avatar">P</div>')
+                ui.element("div").classes("a-avatar"); ui.label("P").classes("text-white text-bold")
                 ui.label("Prashant").classes("font-medium text-sm")
-                ui.space()
-                ui.icon("unfold_more").classes("text-grey-6 text-sm")
+                ui.space(); ui.icon("unfold_more").classes("text-grey-6 text-sm")
 
-        # --- MAIN AREA ---
+        # ─── MAIN AREA ───
         with ui.element("div").classes("a-main"):
-
-            # Top Nav
-            with ui.element("div").classes("a-topnav"):
+            # top bar
+            with ui.element("div").classes("a-topbar"):
                 with ui.row().classes("items-center gap-0"):
-                    ui.label("Design Arena").classes("a-brand-title")
-                    ui.html('<span class="a-brand-sub">by ✦ Saumya Intelligence</span>')
+                    ui.label("Design Arena").classes("brand-text")
+                    ui.html('<span class="brand-sub">by ✦ Saumya Intelligence</span>')
+                with ui.element("div").classes("gap-4 items-center"):
+                    ui.button("Leaderboards").props("flat no-caps").classes("top-link")
+                    ui.button("Models").props("flat no-caps").classes("top-link")
+                    ui.button("EN", icon="language").props("flat no-caps").classes("top-link")
 
-                with ui.element("div").classes("a-top-links"):
-                    ui.button("Leaderboards").props("flat no-caps").classes("a-top-link")
-                    ui.button("Models").props("flat no-caps").classes("a-top-link")
-                    ui.button("EN", icon="language").props("flat no-caps").classes("a-top-link")
+            # ─── HOME SCREEN ───
+            r["home"] = ui.element("div").classes("a-home")
+            with r["home"]:
+                ui.label("What are you creating today?").classes("home-title")
+                with ui.element("div").classes("home-sub"):
+                    ui.label("by ")
+                    ui.element("span").classes("home-brand"); ui.label("✦ Saumya Intelligence")
+                    ui.label(" • 6.7M+ users")
+                with ui.element("div").classes("prompt-box"):
+                    r["inp"] = ui.textarea(
+                        placeholder=(
+                            "Describe the website you want to build...\n\n"
+                            "e.g. A responsive React beauty parlour website with:\n"
+                            "- About, Services, Gallery pages\n"
+                            "- Admin panel for content management\n"
+                            "- Modern, production-quality design"
+                        )
+                    ).props("autogrow borderless").classes("prompt-input w-full")
+                    with ui.element("div").classes("prompt-tools"):
+                        with ui.element("div").classes("tool-grp"):
+                            ui.button(icon="attach_file").props("flat dense").classes("tool-btn")
+                            ui.button(icon="cloud_upload").props("flat dense").classes("tool-btn")
+                            ui.element("div").classes("tool-chip"); ui.icon("bolt", size="15px"); ui.label("FAST"); ui.icon("expand_more", size="14px")
+                            ui.element("div").classes("tool-chip tool-chip-on"); ui.icon("web", size="15px"); ui.label("Website")
+                        ui.button(icon="arrow_upward", on_click=_submit).props("unelevated round").classes("send-btn")
 
-            # ============ HOME SCREEN ============
-            refs["home_container"] = ui.element("div").classes("a-home")
-            with refs["home_container"]:
-                ui.label("What are you creating today?").classes("a-hero-title")
-                with ui.element("div").classes("a-hero-sub"):
-                    ui.label("by")
-                    ui.html('<span class="a-hero-sub-brand">✦ Saumya Intelligence</span>')
-                    ui.label("• 6.7M+ users")
+            # ─── ARENA SCREEN ───
+            r["arena"] = ui.element("div").classes("a-arena")
+            r["arena"].set_visibility(False)
 
-                with ui.element("div").classes("a-prompt-box"):
-                    refs["prompt_input"] = ui.textarea(
-                        placeholder="Describe the website you want to build...\n\ne.g. Create a responsive React parlour website with:\n- Separate pages for About, Services, Gallery\n- Admin panel for content management\n- Modern, production-quality design"
-                    ).props("borderless").classes("a-prompt-input w-full")
-
-                    with ui.element("div").classes("a-prompt-tools"):
-                        with ui.element("div").classes("a-tool-group"):
-                            ui.button(icon="attach_file").props("flat dense").classes("a-tool-icon-btn")
-                            ui.button(icon="cloud_upload").props("flat dense").classes("a-tool-icon-btn")
-                            with ui.element("div").classes("a-tool-chip"):
-                                ui.html('<i class="material-icons" style="font-size:15px;">bolt</i>')
-                                ui.label("FAST")
-                                ui.html('<i class="material-icons" style="font-size:14px;">expand_more</i>')
-                            with ui.element("div").classes("a-tool-chip a-tool-chip-active"):
-                                ui.html('<i class="material-icons" style="font-size:15px;">web</i>')
-                                ui.label("Website")
-
-                        ui.button(icon="arrow_upward", on_click=submit_prompt).props("unelevated round").classes("a-send-btn")
-
-            # ============ ARENA SCREEN ============
-            refs["arena_container"] = ui.element("div").classes("a-arena")
-            refs["arena_container"].set_visibility(False)
-
-            with refs["arena_container"]:
-
-                # LEFT CHAT PANEL
-                with ui.element("div").classes("a-chat-panel"):
-                    with ui.element("div").classes("a-play-banner"):
-                        ui.html('<i class="material-icons" style="font-size:18px;">sports_esports</i>')
+            with r["arena"]:
+                # chat panel (left-center)
+                with ui.element("div").classes("a-chat"):
+                    with ui.element("div").classes("play-banner"):
+                        ui.icon("sports_esports", size="18px").classes("text-green-7")
                         ui.label("Play while you wait")
-
-                    with ui.element("div").classes("a-chat-history"):
-                        refs["user_msg"] = ui.label("").classes("a-msg-user")
-
-                        with ui.element("div").classes("a-msg-card"):
-                            with ui.element("div").classes("a-option-tabs"):
-                                refs["opt_A_tab"] = ui.element("div").classes("a-opt-tab active")
-                                refs["opt_A_tab"].on("click", lambda: toggle_option("A"))
-                                with refs["opt_A_tab"]:
-                                    ui.label("Option A")
-
-                                refs["opt_B_tab"] = ui.element("div").classes("a-opt-tab")
-                                refs["opt_B_tab"].on("click", lambda: toggle_option("B"))
-                                with refs["opt_B_tab"]:
-                                    ui.label("Option B")
-
-                            with ui.element("div").classes("a-artifact-row"):
-                                with ui.row().classes("items-center gap-2 no-wrap"):
-                                    ui.html('<i class="material-icons" style="font-size:18px;">web</i>')
+                    with ui.element("div").classes("chat-scroll"):
+                        r["umsg"] = ui.label("").classes("msg-user")
+                        with ui.element("div").classes("msg-card"):
+                            with ui.element("div").classes("opt-tabs"):
+                                r["tab_a"] = ui.element("div").classes("opt-tab on"); r["tab_a"].on("click", lambda: _switch_opt("A"))
+                                with r["tab_a"]: ui.label("Option A")
+                                r["tab_b"] = ui.element("div").classes("opt-tab"); r["tab_b"].on("click", lambda: _switch_opt("B"))
+                                with r["tab_b"]: ui.label("Option B")
+                            with ui.element("div").classes("art-row"):
+                                with ui.row().classes("items-center gap-2"):
+                                    ui.icon("web", size="18px").classes("text-green-7")
                                     ui.label("Web Apps artifact")
-                                ui.label("6m 18.0s").classes("a-artifact-timer")
-
-                            with ui.element("div").classes("a-agent-status-line"):
-                                ui.label("Bringing your vision to life...")
-
-                        with ui.element("div").classes("a-using-tool"):
+                                ui.label("⏱ building…").classes("art-timer")
+                            with ui.element("div").classes("agent-line"):
+                                ui.label("Bringing your vision to life…")
+                        with ui.element("div").classes("using-tool"):
                             ui.label("Using batch_create_files")
                             ui.icon("expand_more").classes("text-grey-6 text-sm")
-
-                    # Chat input at bottom
-                    with ui.element("div").classes("a-chat-input-wrap"):
-                        with ui.element("div").classes("a-chat-input-box"):
-                            ui.textarea(placeholder="Vote on the design above first...").props("borderless").classes("w-full")
-                            with ui.element("div").classes("a-chat-input-tools"):
+                    # chat input
+                    with ui.element("div").classes("chat-input-w"):
+                        with ui.element("div").classes("chat-ibox"):
+                            ui.textarea(props="borderless autogrow").classes("w-full").placeholder("Vote above first…")
+                            with ui.element("div").classes("chat-itools"):
                                 with ui.row().classes("gap-1 items-center"):
-                                    ui.button(icon="attach_file").props("flat dense round").classes("a-tool-icon-btn").style("width:28px; height:28px; min-width:28px; min-height:28px;")
-                                    ui.button(icon="cloud_upload").props("flat dense round").classes("a-tool-icon-btn").style("width:28px; height:28px; min-width:28px; min-height:28px;")
-                                ui.button(icon="arrow_upward", on_click=cast_vote).props("unelevated round dense").classes("a-send-btn").style("width:32px; height:32px; min-width:32px; min-height:32px;")
+                                    ui.button(icon="attach_file").props("flat dense round").classes("tool-btn").style("width:28px;height:28px;min-width:28px;min-height:28px")
+                                    ui.button(icon="cloud_upload").props("flat dense round").classes("tool-btn").style("width:28px;height:28px;min-width:28px;min-height:28px")
+                                ui.button(icon="arrow_upward", on_click=_vote).props("unelevated round dense").classes("send-btn chat-send-sm")
 
-                # RIGHT PREVIEW PANEL
-                with ui.element("div").classes("a-preview-panel"):
+                # preview panel (right)
+                with ui.element("div").classes("a-prev"):
+                    with ui.element("div").classes("prev-tabs"):
+                        r["ptab_a"] = ui.element("div").classes("prev-tab on"); r["ptab_a"].on("click", lambda: _switch_opt("A"))
+                        with r["ptab_a"]: ui.icon("emoji_events").classes("prev-ticon"); ui.label("Option A")
+                        r["ptab_b"] = ui.element("div").classes("prev-tab"); r["ptab_b"].on("click", lambda: _switch_opt("B"))
+                        with r["ptab_b"]: ui.icon("emoji_events").classes("prev-ticon"); ui.label("Option B")
 
-                    # Tabs
-                    with ui.element("div").classes("a-preview-tabs"):
-                        refs["preview_tab_A"] = ui.element("div").classes("a-preview-tab active")
-                        refs["preview_tab_A"].on("click", lambda: toggle_option("A"))
-                        with refs["preview_tab_A"]:
-                            ui.html('<i class="material-icons a-preview-tab-icon">emoji_events</i>')
-                            ui.label("Option A")
-
-                        refs["preview_tab_B"] = ui.element("div").classes("a-preview-tab")
-                        refs["preview_tab_B"].on("click", lambda: toggle_option("B"))
-                        with refs["preview_tab_B"]:
-                            ui.html('<i class="material-icons a-preview-tab-icon">emoji_events</i>')
-                            ui.label("Option B")
-
-                    # Toolbar
-                    with ui.element("div").classes("a-preview-toolbar"):
-                        with ui.element("div").classes("a-mode-toggle"):
-                            refs["mode_btn_preview"] = ui.button(icon="visibility", on_click=lambda: set_display_mode("preview")).props("flat").classes("a-mode-btn active")
-                            refs["mode_btn_code"] = ui.button(icon="code", on_click=lambda: set_display_mode("code")).props("flat").classes("a-mode-btn")
-
-                        refs["url_bar"] = ui.element("div").classes("a-url-bar")
-                        with refs["url_bar"]:
-                            ui.html('<i class="material-icons">public</i>')
+                    with ui.element("div").classes("prev-toolbar"):
+                        with ui.element("div").classes("mode-tog"):
+                            r["m_eye"] = ui.button(icon="visibility", on_click=lambda: _set_mode("preview")).props("flat").classes("mode-btn on")
+                            r["m_code"] = ui.button(icon="code", on_click=lambda: _set_mode("code")).props("flat").classes("mode-btn")
+                        r["ubar"] = ui.element("div").classes("url-bar")
+                        with r["ubar"]:
+                            ui.icon("public", size="16px").classes("text-grey-6")
                             ui.label("Vote to get link")
+                        ui.button(icon="content_copy", on_click=_copy_url).props("flat dense").classes("tbar-btn")
+                        ui.button(icon="open_in_new", on_click=_open_live).props("flat dense").classes("tbar-btn")
+                        ui.button(icon="refresh", on_click=_refresh_viewer).props("flat dense").classes("tbar-btn")
+                        ui.button(icon="open_in_full", on_click=_fullscreen).props("flat dense").classes("tbar-btn")
+                        r["fsel"] = ui.select(options=[], on_change=_pick_file).props("dense outlined options-dense").classes("w-40")
+                        ui.button("Download", icon="download", on_click=_download).props("flat no-caps").classes("tbar-btn")
+                        r["pub_btn"] = ui.button("Publish", icon="lock_open", on_click=_publish).props("unelevated no-caps").classes("pub-btn")
 
-                        ui.button(icon="content_copy", on_click=copy_url).props("flat dense").classes("a-toolbar-btn")
-                        ui.button(icon="open_in_new", on_click=open_published_site).props("flat dense").classes("a-toolbar-btn")
-                        ui.button(icon="refresh", on_click=refresh_preview).props("flat dense").classes("a-toolbar-btn")
-                        ui.button(icon="open_in_full", on_click=toggle_fullscreen).props("flat dense").classes("a-toolbar-btn")
-                        refs["code_file_select"] = ui.select(
-                            options=[], on_change=select_code_file
-                        ).props("dense outlined options-dense").classes("w-40")
-                        ui.button("Download code", icon="download", on_click=download_active_project).props("flat no-caps").classes("a-toolbar-btn")
-                        ui.button("Publish", icon="lock_open", on_click=publish_site).props("unelevated no-caps").classes("a-publish-btn")
+                    # body
+                    with ui.element("div").classes("prev-body"):
+                        r["load"] = ui.element("div").classes("load-overlay")
+                        r["load"].set_visibility(False)
+                        with r["load"]:
+                            with ui.element("div").classes("globe"):
+                                ui.icon("language", size="48px").classes("text-green-7")
+                            ui.label("Building Preview").classes("load-title")
+                            ui.label("The agent is working on your app…").classes("load-sub")
+                            with ui.element("div").classes("dots"):
+                                for _ in range(3):
+                                    ui.element("div").classes("dot")
+                        r["ifr_wrap"] = ui.html('<div style="padding:80px;text-align:center;color:#999">Submit a prompt</div>').classes("ifr-wrap w-full h-full")
+                        r["cview"] = ui.html("").classes("code-view")
 
-                    # Preview Body
-                    with ui.element("div").classes("a-preview-body"):
-
-                        # Loading state
-                        refs["loading_overlay"] = ui.element("div").classes("a-loading")
-                        refs["loading_overlay"].set_visibility(False)
-                        with refs["loading_overlay"]:
-                            with ui.element("div").classes("a-globe"):
-                                ui.html('<i class="material-icons">language</i>')
-                            ui.label("Building Preview").classes("a-load-title")
-                            ui.label("The agent is working on your app...").classes("a-load-sub")
-                            with ui.element("div").classes("a-dots"):
-                                ui.html('<div class="a-dot"></div><div class="a-dot"></div><div class="a-dot"></div>')
-
-                        # Iframe
-                        refs["preview_iframe"] = ui.html('<div style="padding:80px; text-align:center; color:#999;">Submit a prompt to see your website here</div>').classes("a-preview-iframe-wrap w-full h-full")
-
-                        # Code view
-                        refs["code_view"] = ui.html('').classes("a-code-view")
-
-    update_recent_projects()
+    _refresh_recent()

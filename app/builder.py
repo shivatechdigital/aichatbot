@@ -500,7 +500,9 @@ BUILDER_CSS = """
 /* Editor */
 .b-editor-body {
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
+    min-width: 0;
     padding: 0 !important;
     display: flex;
     overflow: hidden;
@@ -510,6 +512,7 @@ BUILDER_CSS = """
 .b-editor-body .q-field {
     width: 100%;
     height: 100%;
+    min-width: 0;
 }
 
 .b-editor-body .q-field__control {
@@ -533,6 +536,7 @@ BUILDER_CSS = """
 .b-editor-body textarea {
     width: 100% !important;
     height: 100% !important;
+    min-width: 0 !important;
     padding: 18px 22px !important;
     background: #0d0d15 !important;
     color: #e8e8ed !important;
@@ -542,10 +546,15 @@ BUILDER_CSS = """
     border: 0 !important;
     outline: none !important;
     resize: none !important;
+    white-space: pre !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
     caret-color: #8b5cf6;
 }
 
-.b-editor-body textarea::-webkit-scrollbar { width: 10px; }
+.b-editor-body textarea::-webkit-scrollbar { width: 10px; height: 10px; }
 .b-editor-body textarea::-webkit-scrollbar-track { background: #0d0d15; }
 .b-editor-body textarea::-webkit-scrollbar-thumb {
     background: #24243a;

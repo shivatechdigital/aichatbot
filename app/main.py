@@ -666,6 +666,12 @@ body {
 }
 
 .composer-input {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-width: 0;
+    gap: 8px !important;
+}
 
 .composer .q-field__control,
 .composer .q-field__native {

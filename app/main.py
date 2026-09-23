@@ -23,10 +23,13 @@ from pypdf import PdfReader
 
 LLM_URL = os.getenv(
     "LLM_URL",
-    "http://host.docker.internal:3010/v1/chat/completions"
+    os.getenv(
+        "API_BASE_URL",
+        "http://host.docker.internal:3010/v1/chat/completions",
+    ),
 )
 
-LLM_MODEL = os.getenv("LLM_MODEL", "local-model")
+LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("MODEL_NAME", "auto"))
 
 # If the browser is running on the same Docker host, this Python
 # backend can talk to the LLM directly.
@@ -735,11 +738,12 @@ def load_chat(chat):
 
 async def call_llm(messages):
     payload = {
-        "model": LLM_MODEL,
         "messages": messages,
         "temperature": 0.2,
         "stream": False,
     }
+    if LLM_MODEL.lower() != "auto":
+        payload["model"] = LLM_MODEL
 
     async with httpx.AsyncClient(timeout=180) as client:
         response = await client.post(
@@ -747,7 +751,13 @@ async def call_llm(messages):
             json=payload,
         )
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            details = response.text.strip()[:1000]
+            raise RuntimeError(
+                f"LLM API returned {response.status_code}: {details or error}"
+            ) from error
         data = response.json()
 
     return (

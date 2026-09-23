@@ -11,6 +11,7 @@ services:
       - .env
     environment:
       API_BASE_URL: http://host.docker.internal:3010/v1/chat/completions
+      MODEL_NAME: auto
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

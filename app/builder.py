@@ -3,6 +3,7 @@
 import html
 import importlib.util
 import io
+import json
 import pkgutil
 import re
 import asyncio
@@ -973,18 +974,15 @@ def published_page(slug: str) -> None:
     )
 
 
-def _render_code_view(files: dict[str, str]) -> str:
+def _render_code_view(files: dict[str, str], selected_file: str | None = None) -> str:
     """Render files as HTML for the code view."""
-    parts = []
-    for filename in ["index.html", "style.css", "script.js"]:
-        content = files.get(filename, "")
-        if content:
-            escaped = html.escape(content)
-            parts.append(
-                f'<div class="code-file-label">📄 {filename}</div>'
-                f'<pre><code>{escaped}</code></pre>'
-            )
-    return "".join(parts) if parts else '<pre>Waiting for code generation...</pre>'
+    if not files:
+        return '<pre>Waiting for code generation...</pre>'
+    filename = selected_file if selected_file in files else sorted(files)[0]
+    return (
+        f'<div class="code-file-label">{html.escape(filename)}</div>'
+        f'<pre><code>{html.escape(files[filename])}</code></pre>'
+    )
 
 
 # ============================================================
@@ -1019,6 +1017,7 @@ def builder_page() -> None:
         "published_url_B": "",
         "project_id_A": None,
         "project_id_B": None,
+        "selected_file": "index.html",
     }
 
     # UI element refs (populated during build)
@@ -1041,7 +1040,9 @@ def builder_page() -> None:
 
         # Code view
         if refs.get("code_view"):
-            refs["code_view"].set_content(_render_code_view(active_code))
+            refs["code_view"].set_content(
+                _render_code_view(active_code, state["selected_file"])
+            )
 
         # URL Bar
         if refs.get("url_bar"):
@@ -1059,6 +1060,13 @@ def builder_page() -> None:
 
     def toggle_option(opt: str):
         state["active_option"] = opt
+        active_code = state["code_A"] if opt == "A" else state["code_B"]
+        if active_code and state["selected_file"] not in active_code:
+            state["selected_file"] = sorted(active_code)[0]
+        if refs.get("code_file_select"):
+            refs["code_file_select"].set_options(
+                sorted(active_code), value=state["selected_file"]
+            )
         # Update left panel tabs
         if refs.get("opt_A_tab"):
             refs["opt_A_tab"].classes(add="active" if opt == "A" else "", remove="active" if opt == "B" else "")
@@ -1083,6 +1091,70 @@ def builder_page() -> None:
             refs["preview_iframe"].classes(remove="hidden")
             refs["mode_btn_preview"].classes(add="active")
             refs["mode_btn_code"].classes(remove="active")
+
+    def select_code_file(event):
+        state["selected_file"] = event.value
+        update_viewer()
+
+    def download_active_project():
+        code = state["code_A"] if state["active_option"] == "A" else state["code_B"]
+        if not code:
+            ui.notify("Generate a website before downloading its code.", type="warning")
+            return
+        filename = re.sub(r"[^A-Za-z0-9._-]+", "-", state["prompt"][:40]).strip("-")
+        ui.download(_build_project_zip(code), f"{filename or 'website-project'}.zip")
+        ui.notify("Project ZIP downloaded.", type="positive")
+
+    def open_published_site():
+        opt = state["active_option"]
+        url = state["published_url_A"] if opt == "A" else state["published_url_B"]
+        if not url:
+            ui.notify("Publish this option first.", type="warning")
+            return
+        ui.run_javascript(f"window.open({json.dumps(url)}, '_blank')")
+
+    def toggle_fullscreen():
+        ui.run_javascript(
+            "const el=document.querySelector('.a-preview-body');"
+            "if (document.fullscreenElement) document.exitFullscreen();"
+            "else if (el) el.requestFullscreen();"
+        )
+
+    def open_saved_project(project_id: int):
+        files = {
+            item["path"]: item["content"] for item in db.get_project_files(project_id)
+        }
+        if not files:
+            ui.notify("This project has no generated files.", type="warning")
+            return
+        project = next((item for item in db.get_all_projects() if item["id"] == project_id), None)
+        state["prompt"] = project["name"] if project else "Saved website"
+        state["status"] = "ready"
+        state["voted"] = True
+        state["active_option"] = "A"
+        state["code_A"] = files
+        state["selected_file"] = sorted(files)[0]
+        publication = db.get_project_publication(project_id)
+        state["published_url_A"] = f"/published/{publication['slug']}" if publication else ""
+        refs["home_container"].set_visibility(False)
+        refs["arena_container"].set_visibility(True)
+        refs["user_msg"].set_text(state["prompt"])
+        update_viewer()
+
+    def update_recent_projects():
+        recent = refs.get("recent_projects")
+        if recent is None:
+            return
+        recent.clear()
+        with recent:
+            projects = db.get_all_projects()[:8]
+            if not projects:
+                ui.label("No saved designs yet").classes("text-grey-6 text-sm")
+            for project in projects:
+                with ui.element("div").classes("a-recent-item") as item:
+                    ui.html('<div class="a-recent-dot"></div>')
+                    ui.label(project["name"])
+                item.on("click", lambda _event=None, pid=project["id"]: open_saved_project(pid))
 
     async def generate_option(option_name: str, personality: str):
         """Generate one version by calling the LLM."""
@@ -1165,6 +1237,12 @@ def builder_page() -> None:
         )
 
         state["status"] = "ready"
+        active_code = state["code_A"]
+        state["selected_file"] = sorted(active_code)[0] if active_code else "index.html"
+        if refs.get("code_file_select"):
+            refs["code_file_select"].set_options(
+                sorted(active_code), value=state["selected_file"]
+            )
         refs["loading_overlay"].set_visibility(False)
         update_viewer()
 
@@ -1189,7 +1267,9 @@ def builder_page() -> None:
 
         # Save the selected option and create a stable local publication.
         project_name = f"Arena {opt}: {state['prompt'][:30]}"
-        pid = db.create_project(name=project_name)
+        existing_pid = state["project_id_A"] if opt == "A" else state["project_id_B"]
+        pid = existing_pid or db.create_project(name=project_name)
+        db.update_project_name(pid, project_name)
         for p, c in code.items():
             db.save_project_file(pid, p, c)
 
@@ -1208,6 +1288,7 @@ def builder_page() -> None:
         update_viewer()
 
         ui.notify(f"🚀 Option {opt} Published! {url}", type="positive", position="top")
+        update_recent_projects()
 
     def go_home():
         state["view"] = "home"
@@ -1231,7 +1312,9 @@ def builder_page() -> None:
         opt = state["active_option"]
         url = state["published_url_A"] if opt == "A" else state["published_url_B"]
         if url:
-            ui.run_javascript(f'navigator.clipboard.writeText("{url}")')
+            ui.run_javascript(
+                f"navigator.clipboard.writeText(new URL({json.dumps(url)}, location.origin).href)"
+            )
             ui.notify("URL copied!", type="positive")
         else:
             ui.notify("Publish first to get URL", type="warning")
@@ -1260,17 +1343,9 @@ def builder_page() -> None:
 
             # Recent
             with ui.element("div").classes("a-recent"):
-                ui.label("RECENT DESIGNS").classes("a-section-title")
-                for name, cls in [
-                    ("React Real Estate Plat...", ""),
-                    ("Responsive Parlour W...", ""),
-                    ("Checkinn Homes Web E...", "gray"),
-                    ("Affordable OTT Subscri...", "gray"),
-                    ("Futuristic Corporate Vid...", "gray"),
-                ]:
-                    with ui.element("div").classes("a-recent-item"):
-                        ui.html(f'<div class="a-recent-dot {cls}"></div>')
-                        ui.label(name)
+                refs["recent_projects"] = ui.column().classes("w-full gap-0")
+                with refs["recent_projects"]:
+                    ui.label("Loading saved designs...").classes("text-grey-6 text-sm")
 
             # User
             with ui.element("div").classes("a-user"):
@@ -1400,9 +1475,13 @@ def builder_page() -> None:
                             ui.label("Vote to get link")
 
                         ui.button(icon="content_copy", on_click=copy_url).props("flat dense").classes("a-toolbar-btn")
-                        ui.button(icon="open_in_new").props("flat dense").classes("a-toolbar-btn")
+                        ui.button(icon="open_in_new", on_click=open_published_site).props("flat dense").classes("a-toolbar-btn")
                         ui.button(icon="refresh", on_click=refresh_preview).props("flat dense").classes("a-toolbar-btn")
-                        ui.button(icon="open_in_full").props("flat dense").classes("a-toolbar-btn")
+                        ui.button(icon="open_in_full", on_click=toggle_fullscreen).props("flat dense").classes("a-toolbar-btn")
+                        refs["code_file_select"] = ui.select(
+                            options=[], on_change=select_code_file
+                        ).props("dense outlined options-dense").classes("w-40")
+                        ui.button("Download code", icon="download", on_click=download_active_project).props("flat no-caps").classes("a-toolbar-btn")
                         ui.button("Publish", icon="lock_open", on_click=publish_site).props("unelevated no-caps").classes("a-publish-btn")
 
                     # Preview Body
@@ -1424,3 +1503,5 @@ def builder_page() -> None:
 
                         # Code view
                         refs["code_view"] = ui.html('').classes("a-code-view")
+
+    update_recent_projects()

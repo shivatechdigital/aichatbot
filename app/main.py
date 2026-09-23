@@ -368,6 +368,27 @@ body {
     line-height: 1.65;
 }
 
+.message-ai.streaming::after {
+    display: inline-block;
+    width: 7px;
+    height: 1.05em;
+    margin-left: 3px;
+    border-radius: 2px;
+    background: #555;
+    vertical-align: -.15em;
+    content: "";
+    animation: typing-cursor 1s steps(2, start) infinite;
+}
+
+.thinking-label {
+    color: var(--muted);
+    font-style: italic;
+}
+
+@keyframes typing-cursor {
+    50% { opacity: 0; }
+}
+
 .composer {
     gap: 6px !important;
     border: 1px solid #d9d9d9;
@@ -849,7 +870,9 @@ async def stream_llm(messages):
                     .get("content", "")
                 )
                 if content:
-                    yield content
+                    for index in range(0, len(content), 8):
+                        yield content[index:index + 8]
+                        await asyncio.sleep(0.015)
                 return
 
             async for line in response.aiter_lines():
@@ -937,6 +960,10 @@ async def send_message():
     assistant_message = {"role": "assistant", "content": ""}
     current_messages.append(assistant_message)
     assistant_element = render_messages()
+    assistant_element.set_content(
+        '<span class="thinking-label">Thinking...</span>'
+    )
+    assistant_element.classes(add="streaming")
 
     send_button.disable()
 
@@ -952,6 +979,10 @@ async def send_message():
             assistant_message["content"] += chunk
             assistant_element.set_content(
                 format_ai_html(assistant_message["content"])
+            )
+            await ui.run_javascript(
+                "const chat = document.querySelector('.chat-scroll');"
+                "if (chat) chat.scrollTop = chat.scrollHeight;"
             )
             await asyncio.sleep(0)
 
@@ -970,6 +1001,7 @@ async def send_message():
         assistant_element.set_content(format_ai_html(assistant_message["content"]))
 
     finally:
+        assistant_element.classes(remove="streaming")
         send_button.enable()
 
 

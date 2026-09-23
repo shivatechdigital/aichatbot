@@ -13,9 +13,11 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlsplit, urlunsplit
 
 from docx import Document
 from pypdf import PdfReader
+from app.config import config
 
 import app.builder  # noqa: F401 - registers the Website Builder page
 
@@ -65,6 +67,40 @@ OTHER_MODELS = [
     "Grok 4.6",
     "Grok 4.7",
 ]
+
+
+def models_endpoint(completions_url: str) -> str:
+    """Return the OpenAI-compatible model listing endpoint."""
+    parsed = urlsplit(completions_url)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/chat/completions"):
+        path = path[: -len("/chat/completions")]
+    return urlunsplit((parsed.scheme, parsed.netloc, f"{path}/models", "", ""))
+
+
+async def discover_models() -> list[str]:
+    """Read model IDs from the configured Docker/API backend."""
+    headers = {}
+    api_key = config.API_KEY.strip()
+    if api_key and api_key.lower() != "not-needed":
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(10, connect=5)
+        ) as client:
+            response = await client.get(models_endpoint(LLM_URL), headers=headers)
+            response.raise_for_status()
+            data = response.json()
+    except (httpx.HTTPError, ValueError, TypeError):
+        return []
+
+    models = data.get("data", []) if isinstance(data, dict) else []
+    return [
+        item["id"]
+        for item in models
+        if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip()
+    ]
 
 selected_model = "Auto" if LLM_MODEL.lower() == "auto" else LLM_MODEL
 
@@ -1083,7 +1119,8 @@ async def stream_llm(messages, model=None):
     if requested_model.lower() != "auto":
         payload["model"] = requested_model
 
-    async with httpx.AsyncClient(timeout=180) as client:
+    timeout = httpx.Timeout(config.REQUEST_TIMEOUT, connect=min(config.REQUEST_TIMEOUT, 10))
+    async with httpx.AsyncClient(timeout=timeout) as client:
         async with client.stream("POST", LLM_URL, json=payload) as response:
             if response.is_error:
                 details = (await response.aread()).decode(errors="replace")[:1000]
@@ -1265,6 +1302,23 @@ def select_model(name: str):
     model_button.set_text(f"{name}  ▾")
     model_menu.close()
 
+
+async def refresh_model_menu():
+    model_ids = await discover_models()
+    model_options_container.clear()
+    with model_options_container:
+        ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
+        if model_ids:
+            ui.separator()
+            for model_id in model_ids:
+                ui.menu_item(
+                    model_id,
+                    on_click=lambda n=model_id: select_model(n),
+                )
+        else:
+            ui.separator()
+            ui.label("No models found in API").classes("small-muted px-3 py-1")
+
 with ui.row().classes("w-full h-screen gap-0 no-wrap"):
 
     # ---------------- Sidebar ----------------
@@ -1349,21 +1403,8 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
             )
             with model_button:
                 with ui.menu().classes("model-menu") as model_menu:
-                    ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
-                    ui.separator()
-                    for model_name in PRIMARY_MODELS:
-                        ui.menu_item(
-                            model_name,
-                            on_click=lambda n=model_name: select_model(n),
-                        )
-                    ui.separator()
-                    ui.label("Other Models").classes("small-muted px-3 py-1")
-                    with ui.column().classes("model-menu-scroll gap-0"):
-                        for model_name in OTHER_MODELS:
-                            ui.menu_item(
-                                model_name,
-                                on_click=lambda n=model_name: select_model(n),
-                            )
+                    with ui.column().classes("model-menu-scroll gap-0") as model_options_container:
+                        ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
 
         messages_container = ui.column().classes(
             "chat-scroll flex-1 w-full px-4 pb-32"
@@ -1462,6 +1503,9 @@ with ui.dialog() as search_dialog, ui.card().classes("w-[600px] max-w-[90vw]"):
                     )
 
     search_input.on("update:model-value", perform_search)
+
+
+ui.timer(0.1, refresh_model_menu, once=True)
 
 
 # ============================================================

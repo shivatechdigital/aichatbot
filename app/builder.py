@@ -490,7 +490,7 @@ def builder_page():
                     ui.label(p["name"])
                 it.on("click", lambda _, pid=p["id"]: _open_saved(pid))
 
-    async def _gen_one(name: str, style: str):
+    async def _gen_one(name: str, style: str) -> bool:
         try:
             from app.main import stream_llm
         except Exception:
@@ -505,7 +505,7 @@ def builder_page():
                 st["code_A"] = fb
             else:
                 st["code_B"] = fb
-            return
+            return True
 
         instr = (
             "You are a Senior Web Developer. Create a high-quality, production-ready single-page website.\n"
@@ -527,6 +527,7 @@ def builder_page():
                 st["code_A"] = files
             else:
                 st["code_B"] = files
+            return True
         except Exception as exc:
             fallback = {
                 "index.html": f"<h1>Error</h1><pre>{html_mod.escape(str(exc))}</pre>",
@@ -537,6 +538,7 @@ def builder_page():
                 st["code_A"] = fallback
             else:
                 st["code_B"] = fallback
+            return False
 
     async def _submit():
         txt = r["inp"].value if r.get("inp") else ""
@@ -550,7 +552,7 @@ def builder_page():
 
         _switch_opt("A"); _set_mode("preview")
 
-        await asyncio.gather(
+        results = await asyncio.gather(
             _gen_one("A", "Clean, minimalist, modern, professional with subtle animations"),
             _gen_one("B", "Bold, creative, vibrant colors, playful with strong visuals"),
         )
@@ -560,7 +562,15 @@ def builder_page():
             r["fsel"].set_options(sorted(ac), value=st["sel_file"])
         r["load"].set_visibility(False)
         _refresh_viewer()
-        ui.notify("✨ Both designs ready! Vote for your favorite.", type="positive", position="bottom-right")
+        if all(results):
+            ui.notify("✨ Both designs ready! Vote for your favorite.", type="positive", position="bottom-right")
+        else:
+            ui.notify(
+                "AI backend is unavailable. Start the LLM service and try again.",
+                type="negative",
+                timeout=10000,
+                position="bottom-right",
+            )
 
     def _vote():
         if st["status"] != "ready":

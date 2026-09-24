@@ -151,6 +151,11 @@ def current_user_id() -> int:
     return int(user["id"])
 
 
+def logout():
+    app.storage.user.clear()
+    ui.run_javascript("location.reload()")
+
+
 chats = []
 chat_counter = 1
 
@@ -1707,11 +1712,6 @@ def submit_auth():
         ui.notify(f"Signed in as {email}", type="positive")
     except ValueError as error:
         ui.notify(str(error), type="negative")
-
-
-def logout():
-    app.storage.user.clear()
-    ui.run_javascript("location.reload()")
 
 
 with ui.dialog().props("persistent") as auth_dialog, ui.card().classes(

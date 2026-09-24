@@ -1278,11 +1278,6 @@ async def send_message():
     global current_messages, pending_attachments, selected_model
     global generation_task, generation_cancelled, pending_auth_prompt
 
-    if generation_task is not None and not generation_task.done():
-        generation_cancelled = True
-        generation_task.cancel()
-        return
-
     text = message_input.value.strip()
 
     if not text and not pending_attachments:
@@ -1292,6 +1287,11 @@ async def send_message():
         pending_auth_prompt = text
         auth_dialog.open()
         ui.notify("Please sign in to send this message.", type="warning")
+        return
+
+    if generation_task is not None and not generation_task.done():
+        generation_cancelled = True
+        generation_task.cancel()
         return
 
     generation_task = asyncio.current_task()

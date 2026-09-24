@@ -143,7 +143,12 @@ def logged_in_user() -> dict | None:
     storage = nicegui_context.client.storage
     user_id = storage.get("user_id")
     email = storage.get("email")
-    return {"id": user_id, "email": email} if user_id and email else None
+    display_name = storage.get("display_name", "User")
+    return (
+        {"id": user_id, "email": email, "display_name": display_name}
+        if user_id and email
+        else None
+    )
 
 
 def current_user_id() -> int:
@@ -167,6 +172,24 @@ def handle_auth_action():
         logout()
     else:
         open_auth_dialog()
+
+
+def refresh_profile_display():
+    user = logged_in_user()
+    if user:
+        profile_name.set_text(user["display_name"])
+        profile_email.set_text("Saumya AI")
+        profile_avatar.set_text(user["display_name"][:1].upper())
+
+
+def open_settings():
+    user = logged_in_user()
+    if not user:
+        auth_dialog.open()
+        return
+    profile_name_input.value = user["display_name"]
+    profile_email_input.value = user["email"]
+    settings_dialog.open()
 
 
 chats = []
@@ -1523,19 +1546,19 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
             ui.button(
                 "Settings",
                 icon="settings",
-                on_click=lambda: settings_dialog.open(),
+                on_click=open_settings,
             ).props("flat align=left").classes(
                 "w-full normal-case"
             )
 
             with ui.row().classes("profile-row items-center"):
-                ui.label("P").classes(
+                profile_avatar = ui.label("P").classes(
                     "bg-black text-white rounded-full "
                     "w-8 h-8 flex items-center justify-center font-bold"
                 )
                 with ui.column().classes("gap-0"):
-                    ui.label("Saumya").classes("text-sm font-semibold")
-                    ui.label("Saumya AI").classes("small-muted")
+                    profile_name = ui.label("User").classes("text-sm font-semibold")
+                    profile_email = ui.label("Saumya AI").classes("small-muted")
                 auth_action_button = ui.button(
                     "Sign in",
                     on_click=handle_auth_action,
@@ -1669,10 +1692,57 @@ ui.timer(0.1, refresh_model_menu, once=True)
 # Settings
 # ============================================================
 
+
+def save_profile():
+    user = logged_in_user()
+    if not user:
+        auth_dialog.open()
+        return
+    try:
+        updated = db.update_user_profile(
+            user["id"], profile_name_input.value, profile_email_input.value
+        )
+        nicegui_context.client.storage.update(updated)
+        refresh_profile_display()
+        ui.notify("Profile updated", type="positive")
+    except ValueError as error:
+        ui.notify(str(error), type="negative")
+
+
+def save_password():
+    user = logged_in_user()
+    if not user:
+        auth_dialog.open()
+        return
+    try:
+        db.change_password(
+            user["id"], current_password_input.value, new_password_input.value
+        )
+        current_password_input.value = ""
+        new_password_input.value = ""
+        ui.notify("Password changed", type="positive")
+    except ValueError as error:
+        ui.notify(str(error), type="negative")
+
 with ui.dialog() as settings_dialog, ui.card().classes("w-[500px] max-w-[90vw]"):
     ui.label("Settings").classes("text-lg font-semibold")
 
     ui.separator()
+
+    ui.label("Profile").classes("font-semibold")
+    profile_name_input = ui.input("Name").classes("w-full")
+    profile_email_input = ui.input("Email").props("type=email").classes("w-full")
+    ui.button("Save profile", on_click=save_profile).props("unelevated").classes(
+        "normal-case bg-black text-white"
+    )
+
+    ui.separator()
+    ui.label("Change password").classes("font-semibold")
+    current_password_input = ui.input("Current password").props("type=password").classes("w-full")
+    new_password_input = ui.input("New password").props("type=password").classes("w-full")
+    ui.button("Change password", on_click=save_password).props("unelevated").classes(
+        "normal-case bg-black text-white"
+    )
 
     ui.switch(
         "Dark mode",
@@ -1703,15 +1773,19 @@ def submit_auth():
     global chats, current_messages, active_chat_id, chat_counter
     try:
         if auth_mode["value"] == "signup":
-            user_id = db.create_user(auth_email.value, auth_password.value)
+            user_id = db.create_user(
+                auth_email.value, auth_password.value, auth_name.value
+            )
             email = auth_email.value.strip().lower()
+            display_name = auth_name.value.strip()
         else:
             user = db.authenticate_user(auth_email.value, auth_password.value)
             if not user:
                 raise ValueError("Invalid email or password")
-            user_id, email = user["id"], user["email"]
+            user_id, email, display_name = user["id"], user["email"], user["display_name"]
         nicegui_context.client.storage["user_id"] = user_id
         nicegui_context.client.storage["email"] = email
+        nicegui_context.client.storage["display_name"] = display_name
         chats = load_persisted_chats(user_id)
         current_messages = []
         active_chat_id = None
@@ -1724,6 +1798,7 @@ def submit_auth():
             message_input.value = pending_auth_prompt
             message_input.run_method("focus")
         auth_action_button.set_text("Logout")
+        refresh_profile_display()
         ui.notify(f"Signed in as {email}", type="positive")
     except ValueError as error:
         ui.notify(str(error), type="negative")
@@ -1734,6 +1809,7 @@ with ui.dialog().props("persistent") as auth_dialog, ui.card().classes(
 ):
     auth_title = ui.label("Sign in").classes("text-2xl font-semibold")
     auth_hint = ui.label("Sign in to access your private chats.").classes("small-muted")
+    auth_name = ui.input("Name (for signup)").props("autocomplete=name").classes("w-full")
     auth_email = ui.input("Email").props("type=email autocomplete=username").classes("w-full mt-4")
     auth_password = ui.input("Password").props(
         "type=password autocomplete=current-password"

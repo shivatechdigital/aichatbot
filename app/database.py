@@ -86,6 +86,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    display_name TEXT NOT NULL DEFAULT 'User',
                     password_hash TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
@@ -96,6 +97,13 @@ class Database:
             }
             if "user_id" not in conversation_columns:
                 connection.execute("ALTER TABLE conversations ADD COLUMN user_id INTEGER")
+            user_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(users)")
+            }
+            if "display_name" not in user_columns:
+                connection.execute(
+                    "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT 'User'"
+                )
             project_columns = {
                 row[1] for row in connection.execute("PRAGMA table_info(projects)")
             }
@@ -118,15 +126,16 @@ class Database:
         except (ValueError, TypeError):
             return False
 
-    def create_user(self, email: str, password: str) -> int:
+    def create_user(self, email: str, password: str, display_name: str = "User") -> int:
         normalized_email = email.strip().lower()
-        if "@" not in normalized_email or len(password) < 8:
-            raise ValueError("Use a valid email and a password of at least 8 characters")
+        display_name = display_name.strip()
+        if "@" not in normalized_email or len(password) < 8 or not display_name:
+            raise ValueError("Use a name, valid email, and password of at least 8 characters")
         with self.get_connection() as connection:
             try:
                 cursor = connection.execute(
-                    "INSERT INTO users (email, password_hash) VALUES (?, ?)",
-                    (normalized_email, self._hash_password(password)),
+                    "INSERT INTO users (email, display_name, password_hash) VALUES (?, ?, ?)",
+                    (normalized_email, display_name[:80], self._hash_password(password)),
                 )
             except sqlite3.IntegrityError as error:
                 raise ValueError("An account with this email already exists") from error
@@ -136,12 +145,43 @@ class Database:
     def authenticate_user(self, email: str, password: str) -> dict | None:
         with self.get_connection() as connection:
             row = connection.execute(
-                "SELECT id, email, password_hash FROM users WHERE email = ?",
+                "SELECT id, email, display_name, password_hash FROM users WHERE email = ?",
                 (email.strip().lower(),),
             ).fetchone()
         if not row or not self._verify_password(password, row["password_hash"]):
             return None
-        return {"id": row["id"], "email": row["email"]}
+        return {"id": row["id"], "email": row["email"], "display_name": row["display_name"]}
+
+    def update_user_profile(self, user_id: int, display_name: str, email: str) -> dict:
+        display_name = display_name.strip()
+        email = email.strip().lower()
+        if not display_name or "@" not in email:
+            raise ValueError("Use a name and valid email")
+        with self.get_connection() as connection:
+            try:
+                connection.execute(
+                    "UPDATE users SET display_name = ?, email = ? WHERE id = ?",
+                    (display_name[:80], email, user_id),
+                )
+            except sqlite3.IntegrityError as error:
+                raise ValueError("An account with this email already exists") from error
+            connection.commit()
+        return {"id": user_id, "email": email, "display_name": display_name[:80]}
+
+    def change_password(self, user_id: int, current_password: str, new_password: str) -> None:
+        if len(new_password) < 8:
+            raise ValueError("New password must be at least 8 characters")
+        with self.get_connection() as connection:
+            row = connection.execute(
+                "SELECT password_hash FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if not row or not self._verify_password(current_password, row["password_hash"]):
+                raise ValueError("Current password is incorrect")
+            connection.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (self._hash_password(new_password), user_id),
+            )
+            connection.commit()
 
     def create_conversation(self, user_id: int | str = 0, title: str = "New Chat") -> int:
         if isinstance(user_id, str):

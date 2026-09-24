@@ -591,6 +591,7 @@ pre { background: #171717; color: #f3f3f3; border-radius: 10px; padding: 14px; o
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
 @media (max-width: 800px) {
+    html, body, #app, .nicegui-content { overflow-x: hidden !important; }
     .desktop-sidebar { display: flex !important; }
     .sidebar-rail { width: 52px !important; }
     .sidebar-panel {
@@ -599,7 +600,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
         bottom: 0;
         left: 52px;
         z-index: 20;
-        width: min(260px, calc(100vw - 52px)) !important;
+        width: calc(100vw - 52px) !important;
+        max-width: calc(100vw - 52px) !important;
+        min-width: 0 !important;
+        overflow-x: hidden !important;
         box-shadow: 8px 0 24px rgba(0, 0, 0, .12);
     }
     .sidebar-open-button {
@@ -1315,7 +1319,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                 ui.label("Saumya AI").classes("text-lg font-semibold tracking-tight text-[#222]")
                 with ui.row().classes("gap-0.5 no-wrap"):
                     ui.button(icon="search", on_click=lambda: search_dialog.open()).props("flat round dense").classes("panel-header-icon")
-                    ui.button(icon="view_sidebar", on_click=toggle_sidebar).props("flat round dense").classes("panel-header-icon")
+                    ui.button(icon="menu_open", on_click=toggle_sidebar).props("flat round dense aria-label='Close menu'").classes("panel-header-icon")
 
             # Scrollable section content
             with ui.column().classes("w-full flex-1 sidebar-scroll gap-0"):
@@ -1334,7 +1338,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
     with ui.column().classes("chat-main flex-1 h-full min-w-0 gap-0"):
 
         sidebar_open_button = ui.button(
-            icon="view_sidebar",
+            icon="menu",
             on_click=toggle_sidebar,
         ).props(
             "flat round dense aria-label='Open sidebar'"

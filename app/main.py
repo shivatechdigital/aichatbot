@@ -215,9 +215,7 @@ ui.add_head_html("""
     --accent: #242421;
 }
 
-html, body, #app {
-    height: 100%;
-}
+html, body, #app { height: 100%; }
 
 body {
     margin: 0;
@@ -242,24 +240,9 @@ body {
     border-right: 1px solid var(--border);
 }
 
-.sidebar-brand {
-    min-height: 44px;
-    padding: 0 7px 7px;
-}
-
-.sidebar-brand-title {
-    color: #171717;
-    font-size: 18px;
-    font-weight: 650;
-    letter-spacing: -.2px;
-}
-
-.sidebar-brand .q-btn {
-    width: 30px !important;
-    min-width: 30px !important;
-    min-height: 30px !important;
-    padding: 0 !important;
-}
+.sidebar-brand { min-height: 44px; padding: 0 7px 7px; }
+.sidebar-brand-title { color: #171717; font-size: 18px; font-weight: 650; letter-spacing: -.2px; }
+.sidebar-brand .q-btn { width: 30px !important; min-width: 30px !important; min-height: 30px !important; padding: 0 !important; }
 
 .sidebar .q-btn {
     min-height: 38px;
@@ -269,96 +252,20 @@ body {
     box-shadow: none !important;
     font-size: 13px;
 }
-
 .sidebar .q-btn::before { box-shadow: none !important; }
 .sidebar .q-btn:hover { background: var(--hover) !important; }
-
-.sidebar-primary {
-    gap: 1px !important;
-    margin: 2px 0 0 !important;
-}
-
-.sidebar-primary .q-btn {
-    width: 100%;
-    justify-content: flex-start !important;
-    min-height: 38px;
-    padding: 0 8px !important;
-    text-align: left;
-}
-
-.sidebar-primary .q-btn__content,
-.sidebar-footer .q-btn__content {
-    width: 100%;
-    flex-wrap: nowrap !important;
-    justify-content: flex-start !important;
-    gap: 8px !important;
-}
-
-.sidebar .q-icon {
-    flex: 0 0 18px;
-    width: 18px;
-    margin: 0 !important;
-    color: #111 !important;
-    font-size: 18px !important;
-    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20;
-}
-
-.recents-label {
-    margin: 18px 8px 6px;
-    color: #908c86;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.chat-list {
-    flex: 1 1 auto;
-    min-height: 0;
-    gap: 2px !important;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #c9c5be transparent;
-}
-
-.chat-list .q-btn {
-    min-height: 36px;
-    padding: 0 9px !important;
-    overflow: hidden;
-}
-
-.chat-list .q-btn__content {
-    display: block;
-    overflow: hidden;
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.chat-item-active {
-    background: #e9e7e2 !important;
-    font-weight: 500;
-}
-
-.sidebar-footer {
-    gap: 2px !important;
-    margin-top: auto !important;
-    padding-top: 8px;
-    background: var(--sidebar);
-}
-
-.sidebar-footer .q-separator {
-    margin: 0 0 8px !important;
-    background: var(--border);
-}
-
-.profile-row {
-    width: 100%;
-    gap: 8px !important;
-    margin-top: 4px;
-    padding: 7px 6px !important;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
+.sidebar-primary { gap: 1px !important; margin: 2px 0 0 !important; }
+.sidebar-primary .q-btn { width: 100%; justify-content: flex-start !important; min-height: 38px; padding: 0 8px !important; text-align: left; }
+.sidebar-primary .q-btn__content, .sidebar-footer .q-btn__content { width: 100%; flex-wrap: nowrap !important; justify-content: flex-start !important; gap: 8px !important; }
+.sidebar .q-icon { flex: 0 0 18px; width: 18px; margin: 0 !important; color: #111 !important; font-size: 18px !important; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; }
+.recents-label { margin: 18px 8px 6px; color: #908c86; font-size: 12px; font-weight: 600; }
+.chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c9c5be transparent; }
+.chat-list .q-btn { min-height: 36px; padding: 0 9px !important; overflow: hidden; }
+.chat-list .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.chat-item-active { background: #e9e7e2 !important; font-weight: 500; }
+.sidebar-footer { gap: 2px !important; margin-top: auto !important; padding-top: 8px; background: var(--sidebar); }
+.sidebar-footer .q-separator { margin: 0 0 8px !important; background: var(--border); }
+.profile-row { width: 100%; gap: 8px !important; margin-top: 4px; padding: 7px 6px !important; border-radius: 8px; cursor: pointer; }
 .profile-row:hover { background: var(--hover); }
 
 .sidebar-open-button {
@@ -376,373 +283,206 @@ body {
     color: #111 !important;
 }
 
-.chat-main {
-    position: relative;
-    height: 100vh;
-    min-height: 0;
-    overflow: hidden;
-    background: var(--canvas);
-}
+.chat-main { position: relative; height: 100vh; min-height: 0; overflow: hidden; background: var(--canvas); }
+.chat-header { flex: 0 0 60px; border-bottom: 1px solid var(--border); }
+.chat-header .q-btn { color: var(--text) !important; }
+.model-menu { width: 230px; padding: 6px 0; border: 1px solid var(--border) !important; border-radius: 12px !important; }
+.model-menu .q-item { min-height: 34px; padding: 4px 14px; font-size: 13px; }
+.model-menu-scroll { max-height: 240px; overflow-y: auto; }
+.chat-scroll { min-height: 0; padding: 24px 28px 190px !important; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c9c5be transparent; }
 
-.chat-header {
-    flex: 0 0 60px;
-    border-bottom: 1px solid var(--border);
-}
-
-.chat-header .q-btn {
-    color: var(--text) !important;
-}
-
-.model-menu {
-    width: 230px;
-    padding: 6px 0;
-    border: 1px solid var(--border) !important;
-    border-radius: 12px !important;
-}
-
-.model-menu .q-item {
-    min-height: 34px;
-    padding: 4px 14px;
-    font-size: 13px;
-}
-
-.model-menu-scroll {
-    max-height: 240px;
-    overflow-y: auto;
-}
-
-.chat-scroll {
-    min-height: 0;
-    padding: 24px 28px 190px !important;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #c9c5be transparent;
-}
-
-.welcome-state {
-    padding-top: clamp(70px, 14vh, 150px) !important;
-}
-
-.welcome-state > :first-child {
-    border-color: var(--border) !important;
-}
-
-.welcome-state .text-3xl {
-    color: #34312d;
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(34px, 4vw, 54px) !important;
-    font-weight: 400 !important;
-    letter-spacing: 0;
-}
-
-.suggestion-grid .q-btn {
-    min-height: 52px;
-    border: 1px solid var(--border) !important;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, .55) !important;
-    color: #4c4842 !important;
-    box-shadow: none !important;
-}
-
+.welcome-state { padding-top: clamp(70px, 14vh, 150px) !important; }
+.welcome-state > :first-child { border-color: var(--border) !important; }
+.welcome-state .text-3xl { color: #34312d; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4vw, 54px) !important; font-weight: 400 !important; letter-spacing: 0; }
+.suggestion-grid .q-btn { min-height: 52px; border: 1px solid var(--border) !important; border-radius: 10px; background: rgba(255, 255, 255, .55) !important; color: #4c4842 !important; box-shadow: none !important; }
 .suggestion-grid .q-btn::before { box-shadow: none !important; }
 .suggestion-grid .q-btn:hover { background: white !important; }
 
-.message-user {
-    background: var(--user);
-    border-radius: 18px;
-    padding: 10px 15px;
-    max-width: 75%;
-    min-width: 0;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-}
+.message-user { background: var(--user); border-radius: 18px; padding: 10px 15px; max-width: 75%; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.user-message-group { width: 100%; max-width: 78%; margin-left: auto; gap: 7px !important; align-items: flex-end !important; }
+.sent-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px !important; }
+.sent-file-card { display: flex; align-items: center; gap: 9px; width: 210px; min-height: 58px; padding: 8px 10px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: white; }
+.sent-file-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 8px; background: #f0efec; color: #222; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.sent-file-name { overflow: hidden; color: var(--text); font-size: 12px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.sent-image-preview { width: 112px !important; height: 88px !important; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
+.sent-image-preview img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
-.user-message-group {
-    width: 100%;
-    max-width: 78%;
-    margin-left: auto;
-    gap: 7px !important;
-    align-items: flex-end !important;
-}
-
-.sent-attachments {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 7px !important;
-}
-
-.sent-file-card {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: 210px;
-    min-height: 58px;
-    padding: 8px 10px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: white;
-}
-
-.sent-file-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 36px;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: #f0efec;
-    color: #222;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.sent-file-name {
-    overflow: hidden;
-    color: var(--text);
-    font-size: 12px;
-    line-height: 1.25;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.sent-image-preview {
-    width: 112px !important;
-    height: 88px !important;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-}
-
-.sent-image-preview img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-}
-
-.message-ai {
-    max-width: 85%;
-    min-width: 0;
-    overflow-wrap: anywhere;
-    line-height: 1.45;
-}
-
-.chat-scroll > .q-column,
-.chat-scroll > .q-row {
-    width: 100%;
-    min-width: 0;
-}
-
-.chat-scroll .message-ai {
-    flex: 1 1 auto;
-}
-
-.message-ai .code-block {
-    width: min(100%, 760px);
-    margin: 8px 0;
-    overflow: hidden;
-    border: 1px solid #2f3338;
-    border-radius: 9px;
-    background: #17191c;
-    color: #e8eaed;
-    line-height: 1.45;
-}
-
-.message-ai .code-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 36px;
-    padding: 0 10px 0 14px;
-    border-bottom: 1px solid #2f3338;
-    background: #202328;
-    color: #aeb4bd;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
-}
-
-.message-ai .code-copy {
-    padding: 5px 8px;
-    border: 0;
-    border-radius: 5px;
-    background: transparent;
-    color: #c6cbd2;
-    cursor: pointer;
-    font-size: 12px;
-}
-
+.message-ai { max-width: 85%; min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.chat-scroll > .q-column, .chat-scroll > .q-row { width: 100%; min-width: 0; }
+.chat-scroll .message-ai { flex: 1 1 auto; }
+.message-ai .code-block { width: min(100%, 760px); margin: 8px 0; overflow: hidden; border: 1px solid #2f3338; border-radius: 9px; background: #17191c; color: #e8eaed; line-height: 1.45; }
+.message-ai .code-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 10px 0 14px; border-bottom: 1px solid #2f3338; background: #202328; color: #aeb4bd; font-family: "Segoe UI", Arial, sans-serif; font-size: 12px; }
+.message-ai .code-copy { padding: 5px 8px; border: 0; border-radius: 5px; background: transparent; color: #c6cbd2; cursor: pointer; font-size: 12px; }
 .message-ai .code-copy:hover { background: #343941; color: white; }
-
-.message-ai .code-block pre {
-    margin: 0;
-    padding: 10px 14px;
-    overflow-x: auto;
-    white-space: pre;
-}
-
-.message-ai .code-block code {
-    color: inherit;
-    font-family: Consolas, "Cascadia Code", monospace;
-    font-size: 13px;
-}
-
-.message-ai.streaming::after {
-    display: inline-block;
-    width: 7px;
-    height: 1.05em;
-    margin-left: 3px;
-    border-radius: 2px;
-    background: #555;
-    vertical-align: -.15em;
-    content: "";
-    animation: typing-cursor 1s steps(2, start) infinite;
-}
-
-.thinking-label {
-    color: var(--muted);
-    font-style: italic;
-}
-
-@keyframes typing-cursor {
-    50% { opacity: 0; }
-}
+.message-ai .code-block pre { margin: 0; padding: 10px 14px; overflow-x: auto; white-space: pre; }
+.message-ai .code-block code { color: inherit; font-family: Consolas, "Cascadia Code", monospace; font-size: 13px; }
+.message-ai.streaming::after { display: inline-block; width: 7px; height: 1.05em; margin-left: 3px; border-radius: 2px; background: #555; vertical-align: -.15em; content: ""; animation: typing-cursor 1s steps(2, start) infinite; }
+.thinking-label { color: var(--muted); font-style: italic; }
+@keyframes typing-cursor { 50% { opacity: 0; } }
 
 /* =====================================
-   ChatGPT Style Composer Changes
+   ChatGPT-style single-line composer
    ===================================== */
-.composer {
-    gap: 4px !important;
-    border: none !important;
-    border-radius: 26px !important;
-    background: #f4f4f4 !important;
-    box-shadow: none !important;
-    padding: 8px 12px 8px 6px !important;
-    min-height: 0;
-}
-
-.composer:focus-within {
-    background: #f4f4f4 !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
 .composer-layer {
     position: absolute;
     right: 0;
     bottom: 0;
     left: 0;
     z-index: 5;
-    padding: 32px 24px 12px !important;
-    background: linear-gradient(to top, var(--canvas) 66%, rgba(251, 250, 247, 0));
+    padding: 24px 24px 12px !important;
+    background: linear-gradient(to top, var(--canvas) 70%, rgba(251, 250, 247, 0));
     pointer-events: none;
 }
-
 .composer-layer > * { pointer-events: auto; }
+
+.composer {
+    display: flex;
+    flex-direction: column;
+    gap: 0 !important;
+    border: 1px solid #e5e5e5 !important;
+    border-radius: 26px !important;
+    background: #f4f4f4 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden;
+}
+
+.composer:focus-within {
+    border-color: #d0d0d0 !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+    background: #f4f4f4 !important;
+}
+
+.attachment-list {
+    display: flex;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 8px 12px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+.attachment-list:empty {
+    display: none !important;
+    padding: 0 !important;
+}
 
 .composer-input {
     display: flex !important;
     align-items: flex-end !important;
     width: 100% !important;
     min-width: 0;
-    gap: 8px !important;
+    min-height: 52px !important;
+    padding: 6px 8px 6px 4px !important;
+    gap: 2px !important;
+    box-sizing: border-box;
 }
 
+.composer-add-btn,
+.composer-action-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    color: #5a5a5a !important;
+    background: transparent !important;
+    align-self: flex-end !important;
+    margin-bottom: 2px !important;
+}
+.composer-add-btn .q-icon,
+.composer-action-btn .q-icon {
+    font-size: 22px !important;
+}
+.composer-add-btn:hover,
+.composer-action-btn:hover {
+    background: rgba(0,0,0,0.06) !important;
+}
+
+/* Stripping Quasar classes to allow textarea to be single line */
 .composer .message-input,
 .composer .message-input.q-field,
 .composer .message-input .q-field__inner {
     flex: 1 1 auto !important;
     height: auto !important;
     min-height: 0 !important;
-    max-height: 200px !important;
-}
-
-.composer .q-field__control,
-.composer .q-field__native {
-    min-height: 24px !important;
-    max-height: 200px !important;
-    color: var(--text);
-    font-size: 16px !important;
-    line-height: 1.5 !important;
+    max-height: none !important;
     background: transparent !important;
 }
 
 .composer .q-field__control {
     height: auto !important;
     min-height: 0 !important;
-    max-height: 200px !important;
+    max-height: none !important;
     padding: 0 !important;
-}
-
-.composer textarea.q-field__native {
-    min-height: 24px !important;
-    max-height: 200px !important;
-    padding: 6px 0 !important;
-    resize: none !important;
-    overflow-y: auto !important;
-    scrollbar-width: thin;
-}
-
-.composer .q-field textarea.q-field__native,
-.composer .q-field__native {
-    min-height: 24px !important;
-    max-height: 200px !important;
-    overflow-y: auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .composer .q-field__control-container {
     height: auto !important;
     min-height: 0 !important;
-    max-height: 200px !important;
-    overflow: hidden !important;
-}
-
-/* ChatGPT Input Action Buttons */
-.composer-action-btn {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-    min-height: 32px !important;
     padding: 0 !important;
-    border-radius: 50% !important;
-    color: #333 !important;
-    background: transparent !important;
-    margin-bottom: 2px !important;
+    overflow: visible !important;
 }
-.composer-action-btn:before { box-shadow: none !important; }
-.composer-action-btn .q-icon { font-size: 20px !important; }
 
-.composer-add-btn {
-    margin-left: 2px;
+/* The actual textarea element */
+textarea.composer-textarea,
+.composer .q-field__native,
+.composer textarea.q-field__native {
+    min-height: 24px !important;
+    height: 24px !important;
+    max-height: 200px !important;
+    padding: 8px 6px !important;
+    margin: 0 !important;
+    margin-bottom: 4px !important;
+    resize: none !important;
+    overflow-y: hidden !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    color: #0d0d0d !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .composer-right-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-bottom: 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    align-self: flex-end !important;
+    gap: 1px !important;
+    height: 36px !important;
+    margin: 0 2px 2px 0 !important;
 }
 
 .composer-think-btn {
     height: 32px !important;
     min-height: 32px !important;
-    padding: 0 10px !important;
+    padding: 0 8px !important;
     border-radius: 16px !important;
-    color: #666 !important;
+    color: #6b6b6b !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
-    font-size: 14px !important;
     text-transform: none !important;
     background: transparent !important;
+    letter-spacing: 0 !important;
 }
-.composer-think-btn:before { box-shadow: none !important; }
 .composer-think-btn .q-icon {
-    font-size: 18px !important;
-    margin-right: 4px;
-    color: #888 !important;
+    font-size: 17px !important;
+    margin-right: 2px !important;
+    color: #8e8e8e !important;
 }
-.composer-think-btn:hover { background: rgba(0,0,0,0.05) !important; }
+.composer-think-btn:hover {
+    background: rgba(0,0,0,0.05) !important;
+}
 
 .composer .send-message-button {
     width: 32px !important;
@@ -753,87 +493,30 @@ body {
     max-height: 32px !important;
     padding: 0 !important;
     border-radius: 50% !important;
-    background: #3b82f6 !important; /* ChatGPT blue */
+    background: #0d6efd !important;
     color: white !important;
-    margin-bottom: 0 !important;
+    box-shadow: none !important;
+    align-self: flex-end !important;
 }
-
 .composer .send-message-button .q-icon {
     font-size: 18px !important;
+    color: white !important;
+}
+.composer .send-message-button:hover {
+    background: #0b5ed7 !important;
+}
+.composer .send-message-button.stop-generation {
+    background: #111 !important;
 }
 
-.composer .send-message-button:hover { background: #2563eb !important; }
-.composer .send-message-button.stop-generation { background: #000 !important; }
-
-.attachment-list {
-    display: flex;
-    flex-wrap: nowrap !important;
-    gap: 6px !important;
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 0 0 5px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: #c9c5be transparent;
-}
-
-.attachment-list::-webkit-scrollbar { height: 5px; }
-.attachment-list::-webkit-scrollbar-thumb { border-radius: 999px; background: #c9c5be; }
-
-.attachment-item {
-    position: relative;
-    flex: 0 0 72px;
-    width: 72px;
-    min-width: 72px;
-    max-width: 72px;
-    height: 72px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--soft, #f3f1ed);
-}
-
+.attachment-item { position: relative; flex: 0 0 72px; width: 72px; min-width: 72px; max-width: 72px; height: 72px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--soft, #f3f1ed); }
 .attachment-image { width: 100% !important; height: 100% !important; }
 .attachment-image img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
-
-.attachment-document {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    padding: 7px;
-    color: var(--muted);
-    font-size: 10px;
-    line-height: 1.2;
-    text-align: center;
-    word-break: break-word;
-}
-
-.composer .attachment-remove {
-    position: absolute !important;
-    top: 3px;
-    right: 3px;
-    z-index: 2;
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
-    min-height: 20px !important;
-    max-width: 20px !important;
-    max-height: 20px !important;
-    padding: 0 !important;
-    border: 1px solid rgba(255, 255, 255, .85) !important;
-    background: rgba(25, 25, 25, .78) !important;
-    color: white !important;
-    font-size: 12px !important;
-}
-
+.attachment-document { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 7px; color: var(--muted); font-size: 10px; line-height: 1.2; text-align: center; word-break: break-word; }
+.composer .attachment-remove { position: absolute !important; top: 3px; right: 3px; z-index: 2; width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; max-width: 20px !important; max-height: 20px !important; padding: 0 !important; border: 1px solid rgba(255, 255, 255, .85) !important; background: rgba(25, 25, 25, .78) !important; color: white !important; font-size: 12px !important; }
 .chat-item { border-radius: 8px; }
 .chat-item:hover { background: var(--hover); }
 .small-muted { color: var(--muted); font-size: 12px; }
-
 pre { background: #171717; color: #f3f3f3; border-radius: 10px; padding: 14px; overflow-x: auto; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
@@ -844,7 +527,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .composer-layer { padding: 42px 12px 10px !important; }
     .welcome-state { padding-top: 12vh !important; }
     .suggestion-grid { grid-template-columns: 1fr !important; }
-    /* Hide Think text on very small screens */
     .composer-think-btn .block { display: none !important; }
     .composer-think-btn .q-icon { margin-right: 0 !important; }
 }
@@ -864,37 +546,44 @@ document.addEventListener('keydown', (event) => {
 
 const resizeComposer = (textarea) => {
     if (!textarea) return;
-    textarea.style.setProperty('height', 'auto', 'important');
-    const maxHeight = 200; // Increased to match ChatGPT large typing area
-    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+    
+    // Reset to single line height first to get true scrollHeight
+    textarea.style.setProperty('height', '24px', 'important');
+    textarea.style.setProperty('overflow-y', 'hidden', 'important');
+    
+    const maxHeight = 200;
+    const scrollH = textarea.scrollHeight;
+    const nextHeight = Math.min(Math.max(scrollH, 24), maxHeight);
+    
     textarea.style.setProperty('height', `${nextHeight}px`, 'important');
-    const field = textarea.closest('.message-input');
-    if (field) {
-        const wrapperHeight = `${nextHeight + 10}px`;
-        field.style.setProperty('height', wrapperHeight, 'important');
-        field.style.setProperty('min-height', wrapperHeight, 'important');
-        field.style.setProperty('max-height', '208px', 'important');
-        field.querySelectorAll('.q-field__inner, .q-field__control, .q-field__control-container')
-            .forEach((element) => {
-                element.style.setProperty('height', wrapperHeight, 'important');
-                element.style.setProperty('min-height', wrapperHeight, 'important');
-            });
-    }
     textarea.style.setProperty(
-        'overflow-y', textarea.scrollHeight > maxHeight ? 'auto' : 'hidden',
+        'overflow-y', 
+        scrollH > maxHeight ? 'auto' : 'hidden', 
         'important'
     );
+    
+    // Ensure Quasar wrappers do not expand unnecessarily
+    const field = textarea.closest('.message-input');
+    if (field) {
+        field.style.setProperty('height', 'auto', 'important');
+        field.style.setProperty('min-height', '0', 'important');
+        field.querySelectorAll('.q-field__inner, .q-field__control, .q-field__control-container')
+            .forEach((element) => {
+                element.style.setProperty('height', 'auto', 'important');
+                element.style.setProperty('min-height', '0', 'important');
+            });
+    }
 };
 
 document.addEventListener('input', (event) => {
     if (event.target.matches('.message-input textarea')) {
         resizeComposer(event.target);
-        requestAnimationFrame(() => resizeComposer(event.target));
     }
 }, true);
 
 window.addEventListener('load', () => {
-    resizeComposer(document.querySelector('.message-input textarea'));
+    const ta = document.querySelector('.message-input textarea');
+    if (ta) resizeComposer(ta);
 });
 
 document.addEventListener('paste', (event) => {
@@ -1150,6 +839,7 @@ async def handle_upload(event):
 def use_suggestion(text: str):
     message_input.value = text
     message_input.run_method("focus")
+    ui.run_javascript("setTimeout(() => resizeComposer(document.querySelector('.message-input textarea')), 100);")
 
 
 def save_current_chat():
@@ -1205,6 +895,7 @@ def new_chat():
     render_attachments()
     render_messages()
     add_chat_to_sidebar("")
+    ui.run_javascript("resizeComposer(document.querySelector('.message-input textarea'));")
 
 
 def load_chat(chat):
@@ -1216,6 +907,7 @@ def load_chat(chat):
     render_attachments()
     render_messages()
     add_chat_to_sidebar("")
+    ui.run_javascript("resizeComposer(document.querySelector('.message-input textarea'));")
 
 
 # ============================================================
@@ -1312,6 +1004,7 @@ async def send_message():
         text = "Describe and analyze the attached file."
 
     message_input.value = ""
+    ui.run_javascript("resizeComposer(document.querySelector('.message-input textarea'));")
 
     attachments = pending_attachments.copy()
     pending_attachments = []
@@ -1573,18 +1266,19 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
         with ui.column().classes("composer-layer"):
             with ui.column().classes("composer w-full max-w-3xl mx-auto"):
                 attachment_list = ui.row().classes("attachment-list")
+                
                 with ui.row().classes("composer-input items-end no-wrap"):
                     ui.button(
                         icon="add",
                         on_click=lambda: attachment_dialog.open(),
                     ).props("flat round dense").classes(
-                        "composer-action-btn composer-add-btn"
+                        "composer-add-btn"
                     )
 
                     message_input = ui.textarea(
                         placeholder="Ask Saumya AI"
                     ).props(
-                        "outlined=false borderless"
+                        "outlined=false borderless input-class='composer-textarea'"
                     ).classes(
                         "message-input flex-1"
                     )

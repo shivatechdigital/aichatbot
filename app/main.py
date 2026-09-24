@@ -766,6 +766,20 @@ body {
     scrollbar-width: thin;
 }
 
+.composer .q-field textarea.q-field__native,
+.composer .q-field__native {
+    height: auto !important;
+    min-height: 28px !important;
+    max-height: 160px !important;
+    overflow-y: auto !important;
+}
+
+.composer .q-field__control-container {
+    min-height: 28px !important;
+    max-height: 160px !important;
+    overflow: hidden !important;
+}
+
 .composer .q-btn {
     align-self: center !important;
     width: 35px !important;

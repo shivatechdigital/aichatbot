@@ -266,6 +266,21 @@ body {
 .sidebar-footer { gap: 2px !important; margin-top: auto !important; padding-top: 8px; background: var(--sidebar); }
 .sidebar-footer .q-separator { margin: 0 0 8px !important; background: var(--border); }
 .profile-row { width: 100%; gap: 8px !important; margin-top: 4px; padding: 7px 6px !important; border-radius: 8px; cursor: pointer; }
+.profile-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    width: 100%;
+    gap: 8px !important;
+    margin-top: 4px;
+    padding: 7px 6px !important;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.profile-row > .q-label:first-child { flex: 0 0 36px; }
+.profile-row > .q-column { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.profile-row > .q-column .q-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-row > .q-btn { flex: 0 0 auto; white-space: nowrap; }
 .profile-row:hover { background: var(--hover); }
 
 .sidebar-open-button {
@@ -1227,7 +1242,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     "w-8 h-8 flex items-center justify-center font-bold"
                 )
                 with ui.column().classes("gap-0"):
-                    profile_name = ui.label("User").classes("text-sm font-semibold")
+                    profile_name = ui.label("User").classes("text-sm font-semibold profile-display-name")
                     profile_email = ui.label("Saumya AI").classes("small-muted")
                 auth_action_button = ui.button(
                     "Sign in",

@@ -856,7 +856,16 @@ document.addEventListener('keydown', (event) => {
 }, true);
 
 document.addEventListener('paste', (event) => {
-    const files = Array.from(event.clipboardData?.files || []);
+    const clipboard = event.clipboardData;
+    const files = Array.from(clipboard?.files || []);
+    if (!files.length) {
+        Array.from(clipboard?.items || []).forEach((item) => {
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) files.push(file);
+            }
+        });
+    }
     if (!files.length) return;
 
     const uploadInput = document.querySelector(

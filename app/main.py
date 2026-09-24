@@ -735,7 +735,7 @@ body {
 
 .composer-input {
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-end !important;
     width: 100% !important;
     min-width: 0;
     gap: 8px !important;
@@ -744,7 +744,7 @@ body {
 .composer .q-field__control,
 .composer .q-field__native {
     min-height: 28px !important;
-    max-height: 160px !important;
+    max-height: 120px !important;
     color: var(--text);
     font-size: 17px;
     line-height: 1.45;
@@ -757,7 +757,7 @@ body {
 
 .composer textarea.q-field__native {
     min-height: 28px !important;
-    max-height: 160px !important;
+    max-height: 120px !important;
     padding: 5px 0 !important;
     resize: none !important;
     overflow-y: auto !important;
@@ -767,18 +767,18 @@ body {
 .composer .q-field textarea.q-field__native,
 .composer .q-field__native {
     min-height: 28px !important;
-    max-height: 160px !important;
+    max-height: 120px !important;
     overflow-y: auto !important;
 }
 
 .composer .q-field__control-container {
     min-height: 28px !important;
-    max-height: 160px !important;
+    max-height: 120px !important;
     overflow: hidden !important;
 }
 
 .composer .q-btn {
-    align-self: center !important;
+    align-self: flex-end !important;
     width: 35px !important;
     height: 35px !important;
     min-width: 35px !important;
@@ -935,7 +935,7 @@ document.addEventListener('keydown', (event) => {
 const resizeComposer = (textarea) => {
     if (!textarea) return;
     textarea.style.setProperty('height', 'auto', 'important');
-    const maxHeight = 160;
+    const maxHeight = 120;
     const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
     textarea.style.setProperty('height', `${nextHeight}px`, 'important');
     textarea.style.setProperty(

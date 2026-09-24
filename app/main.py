@@ -664,7 +664,7 @@ body {
 .composer-layer > * { pointer-events: auto; }
 .composer {
     min-height: 0;
-    padding: 10px 12px !important;
+    padding: 8px 12px !important;
 }
 
 .composer-input {
@@ -677,27 +677,37 @@ body {
 
 .composer .q-field__control,
 .composer .q-field__native {
-    height: 46px !important;
-    min-height: 46px !important;
-    max-height: 46px !important;
+    height: auto !important;
+    min-height: 28px !important;
+    max-height: 160px !important;
     color: var(--text);
     font-size: 17px;
     line-height: 1.45;
 }
 
+.composer .q-field__control {
+    min-height: 28px !important;
+    padding: 0 !important;
+}
+
 .composer textarea.q-field__native {
-    padding: 9px 0 7px !important;
+    height: auto !important;
+    min-height: 28px !important;
+    max-height: 160px !important;
+    padding: 5px 0 !important;
     resize: none !important;
+    overflow-y: auto !important;
+    scrollbar-width: thin;
 }
 
 .composer .q-btn {
     align-self: center !important;
-    width: 54px !important;
-    height: 54px !important;
-    min-width: 54px !important;
-    min-height: 54px !important;
-    max-width: 54px !important;
-    max-height: 54px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    max-width: 44px !important;
+    max-height: 44px !important;
     padding: 0 !important;
 }
 
@@ -705,7 +715,7 @@ body {
     border-radius: 50% !important;
     background: #347ff2 !important;
     color: white !important;
-    font-size: 25px !important;
+    font-size: 22px !important;
     font-weight: 600 !important;
 }
 

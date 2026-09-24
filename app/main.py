@@ -123,6 +123,8 @@ current_messages = []
 chat_counter = 1
 active_chat_id = None
 pending_attachments = []
+generation_task = None
+generation_cancelled = False
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
@@ -1190,6 +1192,15 @@ async def stream_llm(messages, model=None):
 
 async def send_message():
     global current_messages, pending_attachments, selected_model
+    global generation_task, generation_cancelled
+
+    if generation_task is not None and not generation_task.done():
+        generation_cancelled = True
+        generation_task.cancel()
+        return
+
+    generation_task = asyncio.current_task()
+    generation_cancelled = False
 
     text = message_input.value.strip()
 
@@ -1260,7 +1271,8 @@ async def send_message():
     )
     assistant_element.classes(add="streaming")
 
-    send_button.disable()
+    send_button.set_text("■")
+    send_button.classes(add="stop-generation")
 
     try:
         api_messages = [
@@ -1294,6 +1306,10 @@ async def send_message():
                 format_ai_html(assistant_message["content"])
             )
 
+    except asyncio.CancelledError:
+        if not assistant_message["content"]:
+            assistant_message["content"] = "Generation stopped."
+        assistant_element.set_content(format_ai_html(assistant_message["content"]))
     except Exception as e:
         assistant_message["content"] = (
             "⚠️ **LLM connection error**\n\n"
@@ -1304,7 +1320,9 @@ async def send_message():
 
     finally:
         assistant_element.classes(remove="streaming")
-        send_button.enable()
+        send_button.set_text("↑")
+        send_button.classes(remove="stop-generation")
+        generation_task = None
 
 
 # ============================================================

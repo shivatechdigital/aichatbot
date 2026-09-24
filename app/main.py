@@ -18,6 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 from docx import Document
 from pypdf import PdfReader
 from app.config import config
+from app.database import db
 
 import app.builder  # noqa: F401 - registers the Website Builder page
 

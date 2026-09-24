@@ -202,6 +202,28 @@ def now_title(text: str) -> str:
     return text[:35] + ("..." if len(text) > 35 else "")
 
 
+def api_text_content(content):
+    """Normalize message content while preserving image parts for copilot-api."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        has_image = False
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if item.get("type") == "text":
+                    parts.append(str(item.get("text", "")))
+                elif item.get("type") == "image_url":
+                    parts.append(item)
+                    has_image = True
+                else:
+                    parts.append(str(item.get("text", "")))
+        return parts if has_image else "\n".join(part for part in parts if part)
+    return str(content)
+
+
 # ============================================================
 # Styling
 # ============================================================
@@ -1280,7 +1302,9 @@ async def send_message():
         api_messages = [
             {
                 "role": message["role"],
-                "content": message.get("api_content", message["content"]),
+                "content": api_text_content(
+                    message.get("api_content", message["content"])
+                ),
             }
             for message in current_messages[:-1]
         ]

@@ -824,9 +824,8 @@ def add_chat_to_sidebar(title: str):
                 row.classes(add="chat-item-active")
 
             with row:
-                # Plain div title — CSS ellipsis works reliably here
-                title_el = ui.element("div").classes("chat-title")
-                title_el.text = chat["title"]
+                # Proper label element so the text actually renders!
+                title_el = ui.label(chat["title"]).classes("chat-title")
                 title_el.on("click", lambda _e=None, c=chat: load_chat(c))
 
                 with ui.row().classes("chat-actions"):

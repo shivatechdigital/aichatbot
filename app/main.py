@@ -695,6 +695,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
         box-shadow: 8px 0 24px rgba(0, 0, 0, .12);
     }
     .sidebar-open-button {
+        margin-top: 4px !important;
+        margin-left: -45px !important;
         top: 10px;
         left: 62px;
         z-index: 25;

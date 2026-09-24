@@ -692,16 +692,26 @@ body {
 
 .composer .q-btn {
     align-self: center !important;
-    width: 40px !important;
-    height: 40px !important;
-    min-width: 40px !important;
-    min-height: 40px !important;
-    max-width: 40px !important;
-    max-height: 40px !important;
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    min-height: 54px !important;
+    max-width: 54px !important;
+    max-height: 54px !important;
     padding: 0 !important;
 }
 
-.composer .bg-black { background: var(--accent) !important; }
+.composer .send-message-button {
+    border-radius: 50% !important;
+    background: #347ff2 !important;
+    color: white !important;
+    font-size: 25px !important;
+    font-weight: 600 !important;
+}
+
+.composer .send-message-button:hover {
+    background: #246de0 !important;
+}
 
 .attachment-list {
     display: flex;

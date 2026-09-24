@@ -325,9 +325,11 @@ body {
 .sidebar-btn .q-btn__content { flex-wrap: nowrap !important; justify-content: flex-start !important; }
 
 .chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; }
-.chat-list .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; padding: 8px 5px;}
+.chat-list .chat-title-button .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; padding: 8px 5px;}
 .chat-item-active { background: var(--active) !important; font-weight: 500; color: #000 !important; }
-.chat-action { flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; color: #85817a !important; opacity: .7; }
+.chat-action { flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; color: #65615b !important; opacity: 1 !important; padding: 0 !important; }
+.chat-action .q-btn__content { display: flex !important; align-items: center; justify-content: center; padding: 0 !important; overflow: visible !important; }
+.chat-action .q-icon { display: inline-flex !important; color: inherit !important; font-size: 17px !important; }
 .chat-action:hover { opacity: 1; background: var(--hover) !important; color: var(--text) !important; }
 
 .sidebar-open-button {
@@ -728,18 +730,18 @@ def add_chat_to_sidebar(title: str):
                     chat["title"],
                     on_click=lambda c=chat: load_chat(c),
                 ).props("flat align=left").classes(
-                    "flex-1 min-w-0 normal-case justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
+                    "chat-title-button flex-1 min-w-0 normal-case justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
                 )
                 if chat["id"] == active_chat_id:
                     button.classes(add="chat-item-active")
                 ui.button(
                     icon="push_pin" if chat.get("pinned") else "push_pin_outlined",
                     on_click=lambda c=chat: toggle_pin(c),
-                ).props("flat round dense aria-label='Pin chat'").classes("chat-action")
+                ).props("flat round dense aria-label='Pin chat' title='Pin or unpin chat'").classes("chat-action")
                 ui.button(
                     icon="delete_outline",
                     on_click=lambda c=chat: delete_chat(c),
-                ).props("flat round dense aria-label='Delete chat'").classes("chat-action")
+                ).props("flat round dense aria-label='Delete chat' title='Delete chat'").classes("chat-action")
 
 
 def toggle_pin(chat: dict):

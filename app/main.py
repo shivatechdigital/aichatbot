@@ -160,6 +160,9 @@ def current_user_id() -> int:
 
 def logout():
     nicegui_context.client.storage.clear()
+    auth_action_button.set_text("Sign in")
+    profile_name.set_text("User")
+    profile_avatar.set_text("P")
     ui.run_javascript("location.reload()")
 
 
@@ -1762,6 +1765,9 @@ def update_auth_mode(mode: str):
     auth_mode["value"] = mode
     auth_title.set_text("Create account" if mode == "signup" else "Sign in")
     auth_submit.set_text("Sign up" if mode == "signup" else "Sign in")
+    auth_name.set_visibility(mode == "signup")
+    auth_signin_toggle.set_visibility(mode == "signup")
+    auth_signup_toggle.set_visibility(mode == "signin")
     auth_hint.set_text(
         "Use at least 8 characters for your password."
         if mode == "signup"
@@ -1810,6 +1816,7 @@ with ui.dialog().props("persistent") as auth_dialog, ui.card().classes(
     auth_title = ui.label("Sign in").classes("text-2xl font-semibold")
     auth_hint = ui.label("Sign in to access your private chats.").classes("small-muted")
     auth_name = ui.input("Name (for signup)").props("autocomplete=name").classes("w-full")
+    auth_name.set_visibility(False)
     auth_email = ui.input("Email").props("type=email autocomplete=username").classes("w-full mt-4")
     auth_password = ui.input("Password").props(
         "type=password autocomplete=current-password"
@@ -1818,12 +1825,13 @@ with ui.dialog().props("persistent") as auth_dialog, ui.card().classes(
         "w-full normal-case bg-black text-white mt-3"
     )
     with ui.row().classes("w-full justify-center gap-2 mt-2"):
-        ui.button("Sign in", on_click=lambda: update_auth_mode("signin")).props(
+        auth_signin_toggle = ui.button("Sign in", on_click=lambda: update_auth_mode("signin")).props(
             "flat dense"
         ).classes("normal-case")
-        ui.button("Create account", on_click=lambda: update_auth_mode("signup")).props(
+        auth_signup_toggle = ui.button("Create account", on_click=lambda: update_auth_mode("signup")).props(
             "flat dense"
         ).classes("normal-case")
+        auth_signin_toggle.set_visibility(False)
 
 # ============================================================
 # Run

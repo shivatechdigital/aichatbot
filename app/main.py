@@ -4,7 +4,7 @@ import pkgutil
 if not hasattr(pkgutil, "find_loader"):
     pkgutil.find_loader = lambda name: importlib.util.find_spec(name)
 
-from nicegui import ui, app
+from nicegui import app as nicegui_app, ui
 import httpx
 import asyncio
 import base64
@@ -138,8 +138,8 @@ def load_persisted_chats(user_id: int) -> list[dict]:
 
 
 def logged_in_user() -> dict | None:
-    user_id = app.storage.user.get("user_id")
-    email = app.storage.user.get("email")
+    user_id = nicegui_app.storage.user.get("user_id")
+    email = nicegui_app.storage.user.get("email")
     return {"id": user_id, "email": email} if user_id and email else None
 
 
@@ -151,8 +151,8 @@ def current_user_id() -> int:
 
 
 def logout():
-    app.storage.user.clear()
-    app.storage.client.pop("pending_auth_prompt", None)
+    nicegui_app.storage.user.clear()
+    nicegui_app.storage.client.pop("pending_auth_prompt", None)
     ui.run_javascript("location.reload()")
 
 
@@ -1295,7 +1295,7 @@ async def send_message():
         return
 
     if not logged_in_user():
-        app.storage.client["pending_auth_prompt"] = text
+        nicegui_app.storage.client["pending_auth_prompt"] = text
         auth_dialog.open()
         ui.notify("Please sign in to send this message.", type="warning")
         return
@@ -1708,8 +1708,8 @@ def submit_auth():
             if not user:
                 raise ValueError("Invalid email or password")
             user_id, email = user["id"], user["email"]
-        app.storage.user["user_id"] = user_id
-        app.storage.user["email"] = email
+        nicegui_app.storage.user["user_id"] = user_id
+        nicegui_app.storage.user["email"] = email
         chats = load_persisted_chats(user_id)
         current_messages = []
         active_chat_id = None
@@ -1717,7 +1717,7 @@ def submit_auth():
         add_chat_to_sidebar("")
         render_messages()
         auth_dialog.close()
-        pending_auth_prompt = app.storage.client.pop("pending_auth_prompt", "")
+        pending_auth_prompt = nicegui_app.storage.client.pop("pending_auth_prompt", "")
         if pending_auth_prompt:
             message_input.value = pending_auth_prompt
             message_input.run_method("focus")

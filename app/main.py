@@ -110,12 +110,6 @@ async def discover_models() -> list[str]:
 
 selected_model = "Auto" if LLM_MODEL.lower() == "auto" else LLM_MODEL
 
-# If the browser is running on the same Docker host, this Python
-# backend can talk to the LLM directly.
-# For Docker -> host.docker.internal to work on Linux, run the
-# container with:
-#   --add-host=host.docker.internal:host-gateway
-
 # ============================================================
 # State
 # ============================================================
@@ -546,93 +540,6 @@ body {
     flex: 1 1 auto;
 }
 
-.builder-shell {
-    background: var(--canvas);
-    color: var(--text);
-    overflow: hidden;
-}
-
-.builder-sidebar {
-    width: 250px !important;
-    padding: 18px 14px;
-    gap: 12px !important;
-    border-right: 1px solid var(--border);
-    background: var(--sidebar);
-}
-
-.builder-main {
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-.builder-toolbar {
-    flex: 0 0 60px;
-    min-height: 60px;
-    padding: 0 22px;
-    border-bottom: 1px solid var(--border);
-}
-
-.builder-workspace {
-    min-height: 0;
-    overflow: hidden;
-}
-.builder-editor-panel,
-.builder-preview-panel {
-    flex: 1 1 0 !important;
-    gap: 10px !important;
-    min-height: 0;
-    padding: 16px;
-    overflow: hidden;
-}
-
-.builder-editor-panel { border-right: 1px solid var(--border); }
-.builder-editor,
-.builder-prompt { min-height: 0; }
-.builder-editor { flex: 1 1 auto; }
-.builder-prompt { flex: 0 0 150px; }
-.builder-editor textarea,
-.builder-prompt textarea {
-    min-height: 0 !important;
-    resize: none !important;
-    font-family: Consolas, "Cascadia Code", monospace;
-    font-size: 13px;
-    line-height: 1.5;
-}
-.builder-editor textarea { height: 100% !important; }
-.builder-prompt textarea { height: 150px !important; }
-.builder-prompt textarea { font-family: "Segoe UI", Arial, sans-serif; }
-.builder-preview {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: white;
-}
-.builder-preview-frame {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    border: 0;
-    background: white;
-}
-
-@media (max-width: 800px) {
-    .builder-shell { overflow: auto; }
-    .builder-sidebar {
-        width: 190px !important;
-        padding: 14px 10px;
-    }
-    .builder-workspace { overflow: auto; }
-    .builder-editor-panel,
-    .builder-preview-panel {
-        min-width: 48vw;
-        padding: 10px;
-    }
-    .builder-toolbar { padding: 0 12px; }
-}
-
 .message-ai .code-block {
     width: min(100%, 760px);
     margin: 8px 0;
@@ -703,17 +610,23 @@ body {
     50% { opacity: 0; }
 }
 
+/* =====================================
+   ChatGPT Style Composer Changes
+   ===================================== */
 .composer {
-    gap: 6px !important;
-    border: 1px solid #d9d9d9;
-    border-radius: 18px;
-    background: white;
-    box-shadow: 0 8px 30px rgba(35, 32, 28, .08);
+    gap: 4px !important;
+    border: none !important;
+    border-radius: 26px !important;
+    background: #f4f4f4 !important;
+    box-shadow: none !important;
+    padding: 8px 12px 8px 6px !important;
+    min-height: 0;
 }
 
 .composer:focus-within {
-    border-color: #aaa;
-    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    background: #f4f4f4 !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .composer-layer {
@@ -728,10 +641,6 @@ body {
 }
 
 .composer-layer > * { pointer-events: auto; }
-.composer {
-    min-height: 0;
-    padding: 8px 12px !important;
-}
 
 .composer-input {
     display: flex !important;
@@ -747,29 +656,30 @@ body {
     flex: 1 1 auto !important;
     height: auto !important;
     min-height: 0 !important;
-    max-height: 128px !important;
+    max-height: 200px !important;
 }
 
 .composer .q-field__control,
 .composer .q-field__native {
-    min-height: 28px !important;
-    max-height: 120px !important;
+    min-height: 24px !important;
+    max-height: 200px !important;
     color: var(--text);
-    font-size: 17px;
-    line-height: 1.45;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    background: transparent !important;
 }
 
 .composer .q-field__control {
     height: auto !important;
     min-height: 0 !important;
-    max-height: 128px !important;
+    max-height: 200px !important;
     padding: 0 !important;
 }
 
 .composer textarea.q-field__native {
-    min-height: 28px !important;
-    max-height: 120px !important;
-    padding: 5px 0 !important;
+    min-height: 24px !important;
+    max-height: 200px !important;
+    padding: 6px 0 !important;
     resize: none !important;
     overflow-y: auto !important;
     scrollbar-width: thin;
@@ -777,40 +687,83 @@ body {
 
 .composer .q-field textarea.q-field__native,
 .composer .q-field__native {
-    min-height: 28px !important;
-    max-height: 120px !important;
+    min-height: 24px !important;
+    max-height: 200px !important;
     overflow-y: auto !important;
 }
 
 .composer .q-field__control-container {
     height: auto !important;
     min-height: 0 !important;
-    max-height: 128px !important;
+    max-height: 200px !important;
     overflow: hidden !important;
 }
 
-.composer .q-btn {
-    align-self: flex-end !important;
-    width: 35px !important;
-    height: 35px !important;
-    min-width: 35px !important;
-    min-height: 35px !important;
-    max-width: 35px !important;
-    max-height: 35px !important;
+/* ChatGPT Input Action Buttons */
+.composer-action-btn {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
     padding: 0 !important;
+    border-radius: 50% !important;
+    color: #333 !important;
+    background: transparent !important;
+    margin-bottom: 2px !important;
 }
+.composer-action-btn:before { box-shadow: none !important; }
+.composer-action-btn .q-icon { font-size: 20px !important; }
+
+.composer-add-btn {
+    margin-left: 2px;
+}
+
+.composer-right-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px !important;
+}
+
+.composer-think-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 10px !important;
+    border-radius: 16px !important;
+    color: #666 !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    text-transform: none !important;
+    background: transparent !important;
+}
+.composer-think-btn:before { box-shadow: none !important; }
+.composer-think-btn .q-icon {
+    font-size: 18px !important;
+    margin-right: 4px;
+    color: #888 !important;
+}
+.composer-think-btn:hover { background: rgba(0,0,0,0.05) !important; }
 
 .composer .send-message-button {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    padding: 0 !important;
     border-radius: 50% !important;
-    background: #347ff2 !important;
+    background: #3b82f6 !important; /* ChatGPT blue */
     color: white !important;
-    font-size: 22px !important;
-    font-weight: 600 !important;
+    margin-bottom: 0 !important;
 }
 
-.composer .send-message-button:hover {
-    background: #246de0 !important;
+.composer .send-message-button .q-icon {
+    font-size: 18px !important;
 }
+
+.composer .send-message-button:hover { background: #2563eb !important; }
+.composer .send-message-button.stop-generation { background: #000 !important; }
 
 .attachment-list {
     display: flex;
@@ -826,14 +779,8 @@ body {
     scrollbar-color: #c9c5be transparent;
 }
 
-.attachment-list::-webkit-scrollbar {
-    height: 5px;
-}
-
-.attachment-list::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: #c9c5be;
-}
+.attachment-list::-webkit-scrollbar { height: 5px; }
+.attachment-list::-webkit-scrollbar-thumb { border-radius: 999px; background: #c9c5be; }
 
 .attachment-item {
     position: relative;
@@ -848,16 +795,8 @@ body {
     background: var(--soft, #f3f1ed);
 }
 
-.attachment-image {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-.attachment-image img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-}
+.attachment-image { width: 100% !important; height: 100% !important; }
+.attachment-image img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
 .attachment-document {
     display: flex;
@@ -891,44 +830,23 @@ body {
     font-size: 12px !important;
 }
 
-.chat-item {
-    border-radius: 8px;
-}
+.chat-item { border-radius: 8px; }
+.chat-item:hover { background: var(--hover); }
+.small-muted { color: var(--muted); font-size: 12px; }
 
-.chat-item:hover {
-    background: var(--hover);
-}
-
-.small-muted {
-    color: var(--muted);
-    font-size: 12px;
-}
-
-pre {
-    background: #171717;
-    color: #f3f3f3;
-    border-radius: 10px;
-    padding: 14px;
-    overflow-x: auto;
-}
-
-code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
+pre { background: #171717; color: #f3f3f3; border-radius: 10px; padding: 14px; overflow-x: auto; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
 @media (max-width: 800px) {
-    .desktop-sidebar {
-        display: none !important;
-    }
-
-    .message-user {
-        max-width: 90%;
-    }
-
+    .desktop-sidebar { display: none !important; }
+    .message-user { max-width: 90%; }
     .chat-scroll { padding: 16px 12px 170px !important; }
     .composer-layer { padding: 42px 12px 10px !important; }
     .welcome-state { padding-top: 12vh !important; }
     .suggestion-grid { grid-template-columns: 1fr !important; }
+    /* Hide Think text on very small screens */
+    .composer-think-btn .block { display: none !important; }
+    .composer-think-btn .q-icon { margin-right: 0 !important; }
 }
 </style>
 """)
@@ -947,7 +865,7 @@ document.addEventListener('keydown', (event) => {
 const resizeComposer = (textarea) => {
     if (!textarea) return;
     textarea.style.setProperty('height', 'auto', 'important');
-    const maxHeight = 120;
+    const maxHeight = 200; // Increased to match ChatGPT large typing area
     const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
     textarea.style.setProperty('height', `${nextHeight}px`, 'important');
     const field = textarea.closest('.message-input');
@@ -955,7 +873,7 @@ const resizeComposer = (textarea) => {
         const wrapperHeight = `${nextHeight + 10}px`;
         field.style.setProperty('height', wrapperHeight, 'important');
         field.style.setProperty('min-height', wrapperHeight, 'important');
-        field.style.setProperty('max-height', '128px', 'important');
+        field.style.setProperty('max-height', '208px', 'important');
         field.querySelectorAll('.q-field__inner, .q-field__control, .q-field__control-container')
             .forEach((element) => {
                 element.style.setProperty('height', wrapperHeight, 'important');
@@ -1110,8 +1028,6 @@ def render_messages():
                         "bg-black text-white rounded-full "
                         "w-8 h-8 flex items-center justify-center shrink-0"
                     )
-                    # Quasar's HTML rendering is useful for displaying
-                    # formatted model output. Content is escaped first.
                     last_assistant_element = ui.html(
                         format_ai_html(msg["content"])
                     ).classes(
@@ -1124,8 +1040,6 @@ def format_ai_html(text: str) -> str:
     import html
     import re
 
-    # Very small Markdown-like renderer.
-    # For a production app you can replace this with markdown-it.
     parts = text.split("```")
 
     if len(parts) == 1:
@@ -1458,7 +1372,8 @@ async def send_message():
     )
     assistant_element.classes(add="streaming")
 
-    send_button.set_text("■")
+    send_button._props['icon'] = 'stop'
+    send_button.update()
     send_button.classes(add="stop-generation")
 
     try:
@@ -1507,7 +1422,8 @@ async def send_message():
 
     finally:
         assistant_element.classes(remove="streaming")
-        send_button.set_text("↑")
+        send_button._props['icon'] = 'arrow_upward'
+        send_button.update()
         send_button.classes(remove="stop-generation")
         save_current_chat()
         add_chat_to_sidebar("")
@@ -1654,33 +1570,41 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
         render_messages()
 
         # ---------------- Composer ----------------
-        with ui.column().classes(
-            "composer-layer"
-        ):
+        with ui.column().classes("composer-layer"):
             with ui.column().classes("composer w-full max-w-3xl mx-auto"):
                 attachment_list = ui.row().classes("attachment-list")
-                with ui.row().classes("composer-input items-center no-wrap"):
+                with ui.row().classes("composer-input items-end no-wrap"):
                     ui.button(
-                        "+",
+                        icon="add",
                         on_click=lambda: attachment_dialog.open(),
-                    ).props("flat round").classes(
-                        "text-2xl"
+                    ).props("flat round dense").classes(
+                        "composer-action-btn composer-add-btn"
                     )
 
                     message_input = ui.textarea(
-                        placeholder="Message Saumya AI..."
+                        placeholder="Ask Saumya AI"
                     ).props(
                         "outlined=false borderless"
                     ).classes(
                         "message-input flex-1"
                     )
+                    
+                    with ui.row().classes("composer-right-actions items-center no-wrap"):
+                        ui.button(
+                            "Think",
+                            icon="psychology",
+                        ).props("flat dense").classes("composer-think-btn")
+                        
+                        ui.button(
+                            icon="mic",
+                        ).props("flat round dense").classes("composer-action-btn")
 
-                    send_button = ui.button(
-                        "↑",
-                        on_click=send_message,
-                    ).props("round unelevated").classes(
-                        "send-message-button bg-black text-white"
-                    )
+                        send_button = ui.button(
+                            icon="arrow_upward",
+                            on_click=send_message,
+                        ).props("round unelevated dense").classes(
+                            "send-message-button"
+                        )
 
             ui.label(
                 "Saumya AI can make mistakes. Check important information."

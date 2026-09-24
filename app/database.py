@@ -2,6 +2,9 @@
 
 import sqlite3
 import re
+import hashlib
+import hmac
+import secrets
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -31,6 +34,7 @@ class Database:
                 """
                 CREATE TABLE IF NOT EXISTS conversations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
                     title TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -51,6 +55,7 @@ class Database:
 
                 CREATE TABLE IF NOT EXISTS projects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
                     name TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -77,14 +82,74 @@ class Database:
                     FOREIGN KEY (project_id) REFERENCES projects(id)
                         ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
+            conversation_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(conversations)")
+            }
+            if "user_id" not in conversation_columns:
+                connection.execute("ALTER TABLE conversations ADD COLUMN user_id INTEGER")
+            project_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(projects)")
+            }
+            if "user_id" not in project_columns:
+                connection.execute("ALTER TABLE projects ADD COLUMN user_id INTEGER")
             connection.commit()
 
-    def create_conversation(self, title: str = "New Chat") -> int:
+    @staticmethod
+    def _hash_password(password: str, salt: bytes | None = None) -> str:
+        salt = salt or secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 120_000)
+        return f"{salt.hex()}${digest.hex()}"
+
+    @classmethod
+    def _verify_password(cls, password: str, stored: str) -> bool:
+        try:
+            salt_hex, digest_hex = stored.split("$", 1)
+            expected = cls._hash_password(password, bytes.fromhex(salt_hex)).split("$", 1)[1]
+            return hmac.compare_digest(expected, digest_hex)
+        except (ValueError, TypeError):
+            return False
+
+    def create_user(self, email: str, password: str) -> int:
+        normalized_email = email.strip().lower()
+        if "@" not in normalized_email or len(password) < 8:
+            raise ValueError("Use a valid email and a password of at least 8 characters")
+        with self.get_connection() as connection:
+            try:
+                cursor = connection.execute(
+                    "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+                    (normalized_email, self._hash_password(password)),
+                )
+            except sqlite3.IntegrityError as error:
+                raise ValueError("An account with this email already exists") from error
+            connection.commit()
+            return int(cursor.lastrowid)
+
+    def authenticate_user(self, email: str, password: str) -> dict | None:
+        with self.get_connection() as connection:
+            row = connection.execute(
+                "SELECT id, email, password_hash FROM users WHERE email = ?",
+                (email.strip().lower(),),
+            ).fetchone()
+        if not row or not self._verify_password(password, row["password_hash"]):
+            return None
+        return {"id": row["id"], "email": row["email"]}
+
+    def create_conversation(self, user_id: int | str = 0, title: str = "New Chat") -> int:
+        if isinstance(user_id, str):
+            title = user_id
+            user_id = 0
         with self.get_connection() as connection:
             cursor = connection.execute(
-                "INSERT INTO conversations (title) VALUES (?)", (title,)
+                "INSERT INTO conversations (user_id, title) VALUES (?, ?)", (user_id, title)
             )
             connection.commit()
             if cursor.lastrowid is None:
@@ -103,21 +168,93 @@ class Database:
             )
             connection.commit()
 
-    def get_conversation_messages(self, conversation_id: int) -> list[dict]:
+    def replace_conversation(
+        self,
+        user_id: int,
+        conversation_id: int | None,
+        title: str,
+        messages: list[dict],
+    ) -> int:
+        """Persist a complete chat snapshot and return its database ID."""
         with self.get_connection() as connection:
-            rows = connection.execute(
-                "SELECT role, content FROM messages "
-                "WHERE conversation_id = ? ORDER BY id",
-                (conversation_id,),
-            ).fetchall()
+            if conversation_id is None:
+                cursor = connection.execute(
+                    "INSERT INTO conversations (user_id, title) VALUES (?, ?)",
+                    (user_id, title),
+                )
+                conversation_id = int(cursor.lastrowid)
+            else:
+                owned = connection.execute(
+                    "SELECT id FROM conversations WHERE id = ? AND user_id = ?",
+                    (conversation_id, user_id),
+                ).fetchone()
+                if not owned:
+                    raise ValueError("Conversation does not belong to this user")
+                connection.execute(
+                    "UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP "
+                    "WHERE id = ? AND user_id = ?",
+                    (title, conversation_id, user_id),
+                )
+                connection.execute(
+                    "DELETE FROM messages WHERE conversation_id = ?",
+                    (conversation_id,),
+                )
+
+            connection.executemany(
+                "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
+                [
+                    (conversation_id, message["role"], message["content"])
+                    for message in messages
+                    if message.get("role") in {"user", "assistant"}
+                ],
+            )
+            connection.commit()
+            return conversation_id
+
+    def get_conversation_snapshots(self, user_id: int) -> list[dict]:
+        conversations = self.get_all_conversations(user_id)
+        return [
+            {
+                **conversation,
+                "messages": self.get_conversation_messages(user_id, conversation["id"]),
+            }
+            for conversation in conversations
+        ]
+
+    def get_conversation_messages(
+        self, user_id: int, conversation_id: int | None = None
+    ) -> list[dict]:
+        if conversation_id is None:
+            conversation_id = user_id
+            user_id = 0
+        with self.get_connection() as connection:
+            if user_id:
+                rows = connection.execute(
+                    "SELECT role, content FROM messages "
+                    "WHERE conversation_id = ? AND conversation_id IN "
+                    "(SELECT id FROM conversations WHERE id = ? AND user_id = ?) ORDER BY id",
+                    (conversation_id, conversation_id, user_id),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id",
+                    (conversation_id,),
+                ).fetchall()
             return [dict(row) for row in rows]
 
-    def get_all_conversations(self) -> list[dict]:
+    def get_all_conversations(self, user_id: int | None = None) -> list[dict]:
         with self.get_connection() as connection:
-            rows = connection.execute(
-                "SELECT id, title, created_at FROM conversations "
-                "ORDER BY updated_at DESC, id DESC"
-            ).fetchall()
+            if user_id is None:
+                rows = connection.execute(
+                    "SELECT id, title, created_at FROM conversations "
+                    "ORDER BY updated_at DESC, id DESC"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT id, title, created_at FROM conversations "
+                    "WHERE user_id = ? ORDER BY updated_at DESC, id DESC",
+                    (user_id,),
+                ).fetchall()
             return [dict(row) for row in rows]
 
     def delete_conversation(self, conversation_id: int) -> None:

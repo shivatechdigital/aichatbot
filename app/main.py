@@ -125,12 +125,34 @@ active_chat_id = None
 pending_attachments = []
 generation_task = None
 generation_cancelled = False
+pending_auth_prompt = ""
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
 MAX_ATTACHMENT_FILES = 20
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".log"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def load_persisted_chats(user_id: int) -> list[dict]:
+    return db.get_conversation_snapshots(user_id)
+
+
+def logged_in_user() -> dict | None:
+    user_id = app.storage.user.get("user_id")
+    email = app.storage.user.get("email")
+    return {"id": user_id, "email": email} if user_id and email else None
+
+
+def current_user_id() -> int:
+    user = logged_in_user()
+    if not user:
+        raise RuntimeError("Sign in is required")
+    return int(user["id"])
+
+
+chats = []
+chat_counter = 1
 
 
 def now_title(text: str) -> str:
@@ -1134,9 +1156,17 @@ def save_current_chat():
             if chat["id"] == active_chat_id:
                 chat["title"] = now_title(title)
                 chat["messages"] = current_messages.copy()
+                db.replace_conversation(
+                    current_user_id(), active_chat_id, chat["title"], chat["messages"]
+                )
                 return
 
-    active_chat_id = chat_counter
+    active_chat_id = db.replace_conversation(
+        current_user_id(),
+        None,
+        now_title(title),
+        current_messages,
+    )
     chats.insert(
         0,
         {
@@ -1164,7 +1194,7 @@ def new_chat():
 def load_chat(chat):
     global current_messages, active_chat_id, pending_attachments
     save_current_chat()
-    current_messages = chat["messages"].copy()
+    current_messages = db.get_conversation_messages(current_user_id(), chat["id"])
     active_chat_id = chat["id"]
     pending_attachments = []
     render_attachments()
@@ -1241,20 +1271,26 @@ async def stream_llm(messages, model=None):
 
 async def send_message():
     global current_messages, pending_attachments, selected_model
-    global generation_task, generation_cancelled
+    global generation_task, generation_cancelled, pending_auth_prompt
 
     if generation_task is not None and not generation_task.done():
         generation_cancelled = True
         generation_task.cancel()
         return
 
-    generation_task = asyncio.current_task()
-    generation_cancelled = False
-
     text = message_input.value.strip()
 
     if not text and not pending_attachments:
         return
+
+    if not logged_in_user():
+        pending_auth_prompt = text
+        auth_dialog.open()
+        ui.notify("Please sign in to send this message.", type="warning")
+        return
+
+    generation_task = asyncio.current_task()
+    generation_cancelled = False
 
     if not text:
         text = "Describe and analyze the attached file."
@@ -1371,6 +1407,8 @@ async def send_message():
         assistant_element.classes(remove="streaming")
         send_button.set_text("↑")
         send_button.classes(remove="stop-generation")
+        save_current_chat()
+        add_chat_to_sidebar("")
         generation_task = None
 
 
@@ -1480,6 +1518,9 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                 with ui.column().classes("gap-0"):
                     ui.label("Saumya").classes("text-sm font-semibold")
                     ui.label("Saumya AI").classes("small-muted")
+                ui.button("Logout", on_click=logout).props("flat dense").classes(
+                    "normal-case text-xs ml-auto"
+                )
 
     # ---------------- Main ----------------
     with ui.column().classes("chat-main flex-1 h-full min-w-0 gap-0"):
@@ -1625,6 +1666,74 @@ with ui.dialog() as settings_dialog, ui.card().classes("w-[500px] max-w-[90vw]")
     )
 
 
+auth_mode = {"value": "signin"}
+
+
+def update_auth_mode(mode: str):
+    auth_mode["value"] = mode
+    auth_title.set_text("Create account" if mode == "signup" else "Sign in")
+    auth_submit.set_text("Sign up" if mode == "signup" else "Sign in")
+    auth_hint.set_text(
+        "Use at least 8 characters for your password."
+        if mode == "signup"
+        else "Sign in to access your private chats."
+    )
+
+
+def submit_auth():
+    global chats, current_messages, active_chat_id, chat_counter, pending_auth_prompt
+    try:
+        if auth_mode["value"] == "signup":
+            user_id = db.create_user(auth_email.value, auth_password.value)
+            email = auth_email.value.strip().lower()
+        else:
+            user = db.authenticate_user(auth_email.value, auth_password.value)
+            if not user:
+                raise ValueError("Invalid email or password")
+            user_id, email = user["id"], user["email"]
+        app.storage.user["user_id"] = user_id
+        app.storage.user["email"] = email
+        chats = load_persisted_chats(user_id)
+        current_messages = []
+        active_chat_id = None
+        chat_counter = max((chat["id"] for chat in chats), default=0) + 1
+        add_chat_to_sidebar("")
+        render_messages()
+        auth_dialog.close()
+        if pending_auth_prompt:
+            message_input.value = pending_auth_prompt
+            pending_auth_prompt = ""
+            message_input.run_method("focus")
+        ui.notify(f"Signed in as {email}", type="positive")
+    except ValueError as error:
+        ui.notify(str(error), type="negative")
+
+
+def logout():
+    app.storage.user.clear()
+    ui.run_javascript("location.reload()")
+
+
+with ui.dialog().props("persistent") as auth_dialog, ui.card().classes(
+    "w-[420px] max-w-[92vw] p-7"
+):
+    auth_title = ui.label("Sign in").classes("text-2xl font-semibold")
+    auth_hint = ui.label("Sign in to access your private chats.").classes("small-muted")
+    auth_email = ui.input("Email").props("type=email autocomplete=username").classes("w-full mt-4")
+    auth_password = ui.input("Password").props(
+        "type=password autocomplete=current-password"
+    ).classes("w-full")
+    auth_submit = ui.button("Sign in", on_click=submit_auth).props("unelevated").classes(
+        "w-full normal-case bg-black text-white mt-3"
+    )
+    with ui.row().classes("w-full justify-center gap-2 mt-2"):
+        ui.button("Sign in", on_click=lambda: update_auth_mode("signin")).props(
+            "flat dense"
+        ).classes("normal-case")
+        ui.button("Create account", on_click=lambda: update_auth_mode("signup")).props(
+            "flat dense"
+        ).classes("normal-case")
+
 # ============================================================
 # Run
 # ============================================================
@@ -1633,5 +1742,6 @@ ui.run(
     title="Saumya AI",
     host="0.0.0.0",
     port=int(os.getenv("PORT", os.getenv("APP_PORT", "7860"))),
+    storage_secret=os.getenv("STORAGE_SECRET", "change-this-in-production"),
     reload=False,
 )

@@ -830,13 +830,6 @@ def add_chat_to_sidebar(title: str):
 
                 with ui.row().classes("chat-actions"):
                     ui.button(
-                        icon="push_pin" if chat.get("pinned") else "push_pin_outlined",
-                        on_click=lambda c=chat: toggle_pin(c),
-                    ).props(
-                        "flat round dense aria-label='Pin chat' title='Pin or unpin chat'"
-                    ).classes("chat-action")
-
-                    ui.button(
                         icon="delete_outline",
                         on_click=lambda c=chat: delete_chat(c),
                     ).props(

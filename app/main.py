@@ -318,18 +318,41 @@ body {
     justify-content: flex-start !important;
     font-size: 13.5px !important;
     box-shadow: none !important;
+    text-transform: none !important;
 }
 .sidebar-btn::before, .chat-list .q-btn::before { box-shadow: none !important; }
 .sidebar-btn:hover, .chat-list .q-btn:hover { background: var(--hover) !important; color: #000 !important; }
 .sidebar-btn .q-icon { font-size: 18px !important; margin-right: 8px !important; color: #666 !important; }
-.sidebar-btn .q-btn__content { flex-wrap: nowrap !important; justify-content: flex-start !important; }
+.sidebar-btn .q-btn__content { flex-wrap: nowrap !important; justify-content: flex-start !important; min-width: 0 !important; }
+.sidebar-btn .block { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; text-align: left !important; }
 
-.chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; }
-.chat-list .chat-title-button .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; padding: 8px 5px;}
+.chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; overflow-x: hidden; }
+.chat-list .chat-item { width: 100% !important; min-width: 0 !important; }
+
+.chat-list .chat-title-button { 
+    flex: 1 1 auto !important; 
+    min-width: 0 !important; 
+    padding: 0 8px !important; 
+}
+.chat-list .chat-title-button .q-btn__content { 
+    width: 100% !important; 
+    flex-wrap: nowrap !important; 
+    justify-content: flex-start !important; 
+    min-width: 0 !important; 
+}
+.chat-list .chat-title-button .block { 
+    display: block !important; 
+    overflow: hidden !important; 
+    text-align: left !important; 
+    text-overflow: ellipsis !important; 
+    white-space: nowrap !important; 
+    width: 100% !important; 
+}
+
 .chat-item-active { background: var(--active) !important; font-weight: 500; color: #000 !important; }
 .chat-action { flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; color: #65615b !important; opacity: 1 !important; padding: 0 !important; }
-.chat-action .q-btn__content { display: flex !important; align-items: center; justify-content: center; padding: 0 !important; overflow: visible !important; }
-.chat-action .q-icon { display: inline-flex !important; color: inherit !important; font-size: 17px !important; }
+.chat-action .q-btn__content { display: flex !important; align-items: center; justify-content: center; padding: 0 !important; overflow: visible !important; width: 100% !important; }
+.chat-action .q-icon { display: inline-flex !important; color: inherit !important; font-size: 17px !important; margin: 0 !important; }
 .chat-action:hover { opacity: 1; background: var(--hover) !important; color: var(--text) !important; }
 
 .sidebar-open-button {
@@ -734,7 +757,7 @@ def add_chat_to_sidebar(title: str):
                     chat["title"],
                     on_click=lambda c=chat: load_chat(c),
                 ).props("flat align=left").classes(
-                    "chat-title-button flex-1 min-w-0 normal-case justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
+                    "chat-title-button flex-1 min-w-0 justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
                 )
                 if chat["id"] == active_chat_id:
                     button.classes(add="chat-item-active")

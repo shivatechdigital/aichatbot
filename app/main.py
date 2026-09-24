@@ -279,7 +279,7 @@ body {
 .rail-avatar::before { box-shadow: none !important; }
 
 .sidebar-panel {
-    width: 207px !important;
+    width: 260px !important;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
 }
@@ -304,11 +304,12 @@ body {
 
 .sidebar-scroll {
     overflow-y: auto;
+    overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: #d1d1d1 transparent;
 }
 
-.sidebar-btn, .chat-list .q-btn {
+.sidebar-btn {
     width: 100%;
     min-height: 38px !important;
     padding: 0 10px !important;
@@ -320,40 +321,104 @@ body {
     box-shadow: none !important;
     text-transform: none !important;
 }
-.sidebar-btn::before, .chat-list .q-btn::before { box-shadow: none !important; }
-.sidebar-btn:hover, .chat-list .q-btn:hover { background: var(--hover) !important; color: #000 !important; }
+.sidebar-btn::before { box-shadow: none !important; }
+.sidebar-btn:hover { background: var(--hover) !important; color: #000 !important; }
 .sidebar-btn .q-icon { font-size: 18px !important; margin-right: 8px !important; color: #666 !important; }
 .sidebar-btn .q-btn__content { flex-wrap: nowrap !important; justify-content: flex-start !important; min-width: 0 !important; }
 .sidebar-btn .block { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; text-align: left !important; }
 
-.chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; overflow-x: hidden; }
-.chat-list .chat-item { width: 100% !important; min-width: 0 !important; }
-
-.chat-list .chat-title-button { 
-    flex: 1 1 auto !important; 
-    min-width: 0 !important; 
-    padding: 0 8px !important; 
-}
-.chat-list .chat-title-button .q-btn__content { 
-    width: 100% !important; 
-    flex-wrap: nowrap !important; 
-    justify-content: flex-start !important; 
-    min-width: 0 !important; 
-}
-.chat-list .chat-title-button .block { 
-    display: block !important; 
-    overflow: hidden !important; 
-    text-align: left !important; 
-    text-overflow: ellipsis !important; 
-    white-space: nowrap !important; 
-    width: 100% !important; 
+/* ---- Chat list items: robust truncation ---- */
+.chat-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 2px !important;
+    overflow-x: hidden !important;
+    width: 100% !important;
 }
 
-.chat-item-active { background: var(--active) !important; font-weight: 500; color: #000 !important; }
-.chat-action { flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; color: #65615b !important; opacity: 1 !important; padding: 0 !important; }
-.chat-action .q-btn__content { display: flex !important; align-items: center; justify-content: center; padding: 0 !important; overflow: visible !important; width: 100% !important; }
-.chat-action .q-icon { display: inline-flex !important; color: inherit !important; font-size: 17px !important; margin: 0 !important; }
-.chat-action:hover { opacity: 1; background: var(--hover) !important; color: var(--text) !important; }
+.chat-item {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 36px !important;
+    padding: 0 4px !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+.chat-item:hover {
+    background: var(--hover) !important;
+}
+
+.chat-item-active {
+    background: var(--active) !important;
+}
+
+.chat-title {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 13.5px !important;
+    line-height: 36px !important;
+    height: 36px !important;
+    padding: 0 8px !important;
+    color: #333 !important;
+    cursor: pointer !important;
+    border-radius: 8px !important;
+    user-select: none !important;
+}
+
+.chat-item-active .chat-title {
+    font-weight: 500 !important;
+    color: #000 !important;
+}
+
+.chat-actions {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    align-items: center !important;
+    gap: 0 !important;
+    margin-left: 2px !important;
+}
+
+.chat-action {
+    flex: 0 0 28px !important;
+    width: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    color: #65615b !important;
+    background: transparent !important;
+    border-radius: 6px !important;
+}
+.chat-action::before { box-shadow: none !important; }
+.chat-action .q-btn__content {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+.chat-action .q-icon {
+    font-size: 16px !important;
+    margin: 0 !important;
+}
+.chat-action:hover {
+    background: rgba(0,0,0,0.08) !important;
+    color: #111 !important;
+}
 
 .sidebar-open-button {
     position: absolute !important;
@@ -748,27 +813,36 @@ observeChat();
 # ============================================================
 
 def add_chat_to_sidebar(title: str):
+    """Rebuild the Recents list with proper text truncation (no Quasar button text)."""
     chat_list.clear()
 
     for chat in chats:
         with chat_list:
-            with ui.row().classes("chat-item w-full items-center no-wrap gap-1 px-1"):
-                button = ui.button(
-                    chat["title"],
-                    on_click=lambda c=chat: load_chat(c),
-                ).props("flat align=left").classes(
-                    "chat-title-button flex-1 min-w-0 justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
-                )
-                if chat["id"] == active_chat_id:
-                    button.classes(add="chat-item-active")
-                ui.button(
-                    icon="push_pin" if chat.get("pinned") else "push_pin_outlined",
-                    on_click=lambda c=chat: toggle_pin(c),
-                ).props("flat round dense aria-label='Pin chat' title='Pin or unpin chat'").classes("chat-action")
-                ui.button(
-                    icon="delete_outline",
-                    on_click=lambda c=chat: delete_chat(c),
-                ).props("flat round dense aria-label='Delete chat' title='Delete chat'").classes("chat-action")
+            # One row per chat: [title ........] [pin] [delete]
+            row = ui.row().classes("chat-item")
+            if chat["id"] == active_chat_id:
+                row.classes(add="chat-item-active")
+
+            with row:
+                # Plain div title — CSS ellipsis works reliably here
+                title_el = ui.element("div").classes("chat-title")
+                title_el.text = chat["title"]
+                title_el.on("click", lambda _e=None, c=chat: load_chat(c))
+
+                with ui.row().classes("chat-actions"):
+                    ui.button(
+                        icon="push_pin" if chat.get("pinned") else "push_pin_outlined",
+                        on_click=lambda c=chat: toggle_pin(c),
+                    ).props(
+                        "flat round dense aria-label='Pin chat' title='Pin or unpin chat'"
+                    ).classes("chat-action")
+
+                    ui.button(
+                        icon="delete_outline",
+                        on_click=lambda c=chat: delete_chat(c),
+                    ).props(
+                        "flat round dense aria-label='Delete chat' title='Delete chat'"
+                    ).classes("chat-action")
 
 
 def toggle_pin(chat: dict):

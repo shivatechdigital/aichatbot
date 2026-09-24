@@ -680,7 +680,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
 @media (max-width: 800px) {
     html, body, #app, .nicegui-content { overflow-x: hidden !important; }
-    .desktop-sidebar { display: flex !important; }
+    .desktop-sidebar { display: flex; }
     .sidebar-rail { width: 52px !important; }
     .sidebar-panel {
         position: fixed !important;

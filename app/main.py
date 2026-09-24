@@ -855,6 +855,26 @@ document.addEventListener('keydown', (event) => {
     }
 }, true);
 
+document.addEventListener('paste', (event) => {
+    const files = Array.from(event.clipboardData?.files || []);
+    if (!files.length) return;
+
+    const uploadInput = document.querySelector(
+        '.attachment-upload input[type="file"]'
+    );
+    if (!uploadInput) return;
+
+    event.preventDefault();
+    const transfer = new DataTransfer();
+    files.forEach((file, index) => {
+        const extension = file.type.split('/')[1] || 'bin';
+        const name = file.name || `pasted-file-${index + 1}.${extension}`;
+        transfer.items.add(new File([file], name, {type: file.type}));
+    });
+    uploadInput.files = transfer.files;
+    uploadInput.dispatchEvent(new Event('change', {bubbles: true}));
+}, true);
+
 const observeChat = () => {
     const chat = document.querySelector('.chat-scroll');
     if (!chat || chat.dataset.autoScrollReady) return;
@@ -1533,7 +1553,7 @@ with ui.dialog() as attachment_dialog, ui.card().classes("w-[520px] max-w-[90vw]
         on_rejected=lambda: ui.notify("File rejected", type="negative"),
     ).props(
         'accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.py,.log"'
-    ).classes("w-full")
+    ).classes("w-full attachment-upload")
 
 
 # ============================================================

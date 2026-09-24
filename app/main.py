@@ -741,6 +741,15 @@ body {
     gap: 8px !important;
 }
 
+.composer .message-input,
+.composer .message-input.q-field,
+.composer .message-input .q-field__inner {
+    flex: 1 1 auto !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 128px !important;
+}
+
 .composer .q-field__control,
 .composer .q-field__native {
     min-height: 28px !important;
@@ -751,7 +760,9 @@ body {
 }
 
 .composer .q-field__control {
+    height: 38px !important;
     min-height: 28px !important;
+    max-height: 128px !important;
     padding: 0 !important;
 }
 
@@ -772,8 +783,9 @@ body {
 }
 
 .composer .q-field__control-container {
+    height: 38px !important;
     min-height: 28px !important;
-    max-height: 120px !important;
+    max-height: 128px !important;
     overflow: hidden !important;
 }
 
@@ -938,6 +950,18 @@ const resizeComposer = (textarea) => {
     const maxHeight = 120;
     const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
     textarea.style.setProperty('height', `${nextHeight}px`, 'important');
+    const field = textarea.closest('.message-input');
+    if (field) {
+        const wrapperHeight = `${nextHeight + 10}px`;
+        field.style.setProperty('height', wrapperHeight, 'important');
+        field.style.setProperty('min-height', wrapperHeight, 'important');
+        field.style.setProperty('max-height', '128px', 'important');
+        field.querySelectorAll('.q-field__inner, .q-field__control, .q-field__control-container')
+            .forEach((element) => {
+                element.style.setProperty('height', wrapperHeight, 'important');
+                element.style.setProperty('min-height', wrapperHeight, 'important');
+            });
+    }
     textarea.style.setProperty(
         'overflow-y', textarea.scrollHeight > maxHeight ? 'auto' : 'hidden',
         'important'

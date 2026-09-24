@@ -743,7 +743,6 @@ body {
 
 .composer .q-field__control,
 .composer .q-field__native {
-    height: auto !important;
     min-height: 28px !important;
     max-height: 160px !important;
     color: var(--text);
@@ -757,7 +756,6 @@ body {
 }
 
 .composer textarea.q-field__native {
-    height: auto !important;
     min-height: 28px !important;
     max-height: 160px !important;
     padding: 5px 0 !important;
@@ -768,7 +766,6 @@ body {
 
 .composer .q-field textarea.q-field__native,
 .composer .q-field__native {
-    height: auto !important;
     min-height: 28px !important;
     max-height: 160px !important;
     overflow-y: auto !important;
@@ -934,6 +931,28 @@ document.addEventListener('keydown', (event) => {
         document.querySelector('.send-message-button')?.click();
     }
 }, true);
+
+const resizeComposer = (textarea) => {
+    if (!textarea) return;
+    textarea.style.setProperty('height', 'auto', 'important');
+    const maxHeight = 160;
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.setProperty('height', `${nextHeight}px`, 'important');
+    textarea.style.setProperty(
+        'overflow-y', textarea.scrollHeight > maxHeight ? 'auto' : 'hidden',
+        'important'
+    );
+};
+
+document.addEventListener('input', (event) => {
+    if (event.target.matches('.message-input textarea')) {
+        resizeComposer(event.target);
+    }
+}, true);
+
+window.addEventListener('load', () => {
+    resizeComposer(document.querySelector('.message-input textarea'));
+});
 
 document.addEventListener('paste', (event) => {
     const clipboard = event.clipboardData;
@@ -1626,7 +1645,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     message_input = ui.textarea(
                         placeholder="Message Saumya AI..."
                     ).props(
-                        "autogrow outlined=false borderless"
+                        "outlined=false borderless"
                     ).classes(
                         "message-input flex-1"
                     )

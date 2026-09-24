@@ -1535,7 +1535,7 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     ui.label("Saumya").classes("text-sm font-semibold")
                     ui.label("Saumya AI").classes("small-muted")
                 auth_action_button = ui.button(
-                    "Logout" if logged_in_user() else "Sign in",
+                    "Sign in",
                     on_click=handle_auth_action,
                 ).props("flat dense").classes("normal-case text-xs ml-auto")
 

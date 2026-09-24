@@ -745,8 +745,8 @@ body {
 .composer .message-input.q-field,
 .composer .message-input .q-field__inner {
     flex: 1 1 auto !important;
-    height: 38px !important;
-    min-height: 38px !important;
+    height: auto !important;
+    min-height: 0 !important;
     max-height: 128px !important;
 }
 
@@ -760,8 +760,8 @@ body {
 }
 
 .composer .q-field__control {
-    height: 38px !important;
-    min-height: 28px !important;
+    height: auto !important;
+    min-height: 0 !important;
     max-height: 128px !important;
     padding: 0 !important;
 }
@@ -783,8 +783,8 @@ body {
 }
 
 .composer .q-field__control-container {
-    height: 38px !important;
-    min-height: 28px !important;
+    height: auto !important;
+    min-height: 0 !important;
     max-height: 128px !important;
     overflow: hidden !important;
 }
@@ -971,6 +971,7 @@ const resizeComposer = (textarea) => {
 document.addEventListener('input', (event) => {
     if (event.target.matches('.message-input textarea')) {
         resizeComposer(event.target);
+        requestAnimationFrame(() => resizeComposer(event.target));
     }
 }, true);
 

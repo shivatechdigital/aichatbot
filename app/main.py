@@ -154,9 +154,7 @@ def current_user_id() -> int:
 
 def logout():
     nicegui_context.client.storage.clear()
-    auth_action_button.set_text("Sign in")
-    profile_name.set_text("User")
-    profile_avatar.set_text("P")
+    refresh_profile_display()
     ui.run_javascript("location.reload()")
 
 
@@ -174,9 +172,15 @@ def handle_auth_action():
 def refresh_profile_display():
     user = logged_in_user()
     if user:
-        profile_name.set_text(user["display_name"])
-        profile_email.set_text("Saumya AI")
-        profile_avatar.set_text(user["display_name"][:1].upper())
+        profile_rail_avatar.set_text(user["display_name"][:2].upper())
+        profile_menu_name.set_text(user["display_name"])
+        profile_menu_email.set_text(user["email"])
+        auth_menu_item.set_text("Log out")
+    else:
+        profile_rail_avatar.set_text("U")
+        profile_menu_name.set_text("Guest")
+        profile_menu_email.set_text("Sign in to save chats")
+        auth_menu_item.set_text("Sign in")
 
 
 def open_settings():
@@ -205,14 +209,14 @@ def now_title(text: str) -> str:
 ui.add_head_html("""
 <style>
 :root {
-    --sidebar: #f6f5f2;
-    --canvas: #fbfaf7;
-    --border: #dedbd5;
-    --text: #272522;
-    --muted: #77736c;
-    --hover: #ece9e3;
-    --user: #efede8;
-    --accent: #242421;
+    --sidebar-bg: #f9f9f9;
+    --canvas: #ffffff;
+    --border: #ececec;
+    --hover: #ebebeb;
+    --active: #e3e3e3;
+    --text: #0d0d0d;
+    --muted: #8e8e8e;
+    --user: #f4f4f4;
 }
 
 html, body, #app { height: 100%; }
@@ -232,75 +236,124 @@ body {
     max-width: none !important;
 }
 
-.sidebar {
-    gap: 0 !important;
-    width: 190px !important;
-    padding: 10px 8px 8px !important;
-    background: var(--sidebar);
+/* =====================================
+   ChatGPT Dual Sidebar Layout
+   ===================================== */
+.desktop-sidebar {
+    background: var(--sidebar-bg);
+}
+
+.sidebar-rail {
+    width: 60px !important;
+    background: var(--sidebar-bg);
+    border-right: 1px solid transparent;
+}
+
+.rail-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    border-radius: 12px !important;
+    color: #666 !important;
+    background: transparent !important;
+}
+.rail-btn::before { box-shadow: none !important; }
+.rail-btn:hover { background: var(--hover) !important; color: #111 !important; }
+.rail-btn-active { background: #e3e3e3 !important; color: #111 !important; }
+.rail-btn .q-icon { font-size: 22px !important; }
+
+.rail-avatar {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border-radius: 50% !important;
+    background: #343541 !important; 
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 0 !important;
+}
+.rail-avatar:hover { opacity: 0.85; }
+.rail-avatar::before { box-shadow: none !important; }
+
+.sidebar-panel {
+    width: 260px !important;
+    background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
 }
 
-.sidebar-brand { min-height: 44px; padding: 0 7px 7px; }
-.sidebar-brand-title { color: #171717; font-size: 18px; font-weight: 650; letter-spacing: -.2px; }
-.sidebar-brand .q-btn { width: 30px !important; min-width: 30px !important; min-height: 30px !important; padding: 0 !important; }
+.panel-header-icon {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    border-radius: 8px !important;
+    color: #555 !important;
+}
+.panel-header-icon:hover { background: var(--hover) !important; color: #000 !important; }
+.panel-header-icon::before { box-shadow: none !important; }
 
-.sidebar .q-btn {
-    min-height: 38px;
-    border: 0 !important;
-    border-radius: 7px;
-    color: var(--text) !important;
-    box-shadow: none !important;
-    font-size: 13px;
+.section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #a3a3a3;
+    padding: 12px 8px 6px 8px;
+    margin: 0;
 }
-.sidebar .q-btn::before { box-shadow: none !important; }
-.sidebar .q-btn:hover { background: var(--hover) !important; }
-.sidebar-primary { gap: 1px !important; margin: 2px 0 0 !important; }
-.sidebar-primary .q-btn { width: 100%; justify-content: flex-start !important; min-height: 38px; padding: 0 8px !important; text-align: left; }
-.sidebar-primary .q-btn__content, .sidebar-footer .q-btn__content { width: 100%; flex-wrap: nowrap !important; justify-content: flex-start !important; gap: 8px !important; }
-.sidebar .q-icon { flex: 0 0 18px; width: 18px; margin: 0 !important; color: #111 !important; font-size: 18px !important; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; }
-.recents-label { margin: 18px 8px 6px; color: #908c86; font-size: 12px; font-weight: 600; }
-.chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c9c5be transparent; }
-.chat-list .q-btn { min-height: 36px; padding: 0 9px !important; overflow: hidden; }
-.chat-list .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-.chat-item-active { background: #e9e7e2 !important; font-weight: 500; }
-.sidebar-footer { gap: 2px !important; margin-top: auto !important; padding-top: 8px; background: var(--sidebar); }
-.sidebar-footer .q-separator { margin: 0 0 8px !important; background: var(--border); }
-.profile-row { width: 100%; gap: 8px !important; margin-top: 4px; padding: 7px 6px !important; border-radius: 8px; cursor: pointer; }
-.profile-row {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
+
+.sidebar-scroll {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d1d1 transparent;
+}
+
+.sidebar-btn, .chat-list .q-btn {
     width: 100%;
-    gap: 8px !important;
-    margin-top: 4px;
-    padding: 7px 6px !important;
-    border-radius: 8px;
-    cursor: pointer;
+    min-height: 38px !important;
+    padding: 0 10px !important;
+    border-radius: 8px !important;
+    color: #333 !important;
+    background: transparent !important;
+    justify-content: flex-start !important;
+    font-size: 13.5px !important;
+    box-shadow: none !important;
 }
-.profile-row > .q-label:first-child { flex: 0 0 36px; }
-.profile-row > .q-column { flex: 1 1 auto; min-width: 0; overflow: hidden; }
-.profile-row > .q-column .q-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profile-row > .q-btn { flex: 0 0 auto; white-space: nowrap; }
-.profile-row:hover { background: var(--hover); }
+.sidebar-btn::before, .chat-list .q-btn::before { box-shadow: none !important; }
+.sidebar-btn:hover, .chat-list .q-btn:hover { background: var(--hover) !important; color: #000 !important; }
+.sidebar-btn .q-icon { font-size: 18px !important; margin-right: 8px !important; color: #666 !important; }
+.sidebar-btn .q-btn__content { flex-wrap: nowrap !important; justify-content: flex-start !important; }
+
+.chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; }
+.chat-list .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.chat-item-active { background: var(--active) !important; font-weight: 500; color: #000 !important; }
 
 .sidebar-open-button {
     position: absolute !important;
     top: 12px;
     left: 12px;
     z-index: 8;
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
     padding: 0 !important;
-    border: 1px solid var(--border) !important;
-    background: rgba(251, 250, 247, .95) !important;
-    color: #111 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: #555 !important;
 }
+.sidebar-open-button:hover { background: var(--hover) !important; color: #000 !important; }
+.sidebar-open-button::before { box-shadow: none !important; }
 
+/* =====================================
+   Main Chat Canvas
+   ===================================== */
 .chat-main { position: relative; height: 100vh; min-height: 0; overflow: hidden; background: var(--canvas); }
-.chat-header { flex: 0 0 60px; border-bottom: 1px solid var(--border); }
-.chat-header .q-btn { color: var(--text) !important; }
+.chat-header { flex: 0 0 60px; }
+.chat-header .q-btn { color: var(--text) !important; font-size: 16px !important; font-weight: 600 !important; }
+.chat-header .q-btn::before { box-shadow: none !important; }
+.chat-header .q-btn:hover { background: var(--hover) !important; border-radius: 10px !important; }
+
 .model-menu { width: 230px; padding: 6px 0; border: 1px solid var(--border) !important; border-radius: 12px !important; }
 .model-menu .q-item { min-height: 34px; padding: 4px 14px; font-size: 13px; }
 .model-menu-scroll { max-height: 240px; overflow-y: auto; }
@@ -308,12 +361,12 @@ body {
 
 .welcome-state { padding-top: clamp(70px, 14vh, 150px) !important; }
 .welcome-state > :first-child { border-color: var(--border) !important; }
-.welcome-state .text-3xl { color: #34312d; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4vw, 54px) !important; font-weight: 400 !important; letter-spacing: 0; }
-.suggestion-grid .q-btn { min-height: 52px; border: 1px solid var(--border) !important; border-radius: 10px; background: rgba(255, 255, 255, .55) !important; color: #4c4842 !important; box-shadow: none !important; }
+.welcome-state .text-3xl { color: #222; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4vw, 54px) !important; font-weight: 400 !important; letter-spacing: 0; }
+.suggestion-grid .q-btn { min-height: 52px; border: 1px solid var(--border) !important; border-radius: 14px; background: #ffffff !important; color: #555 !important; box-shadow: none !important; }
 .suggestion-grid .q-btn::before { box-shadow: none !important; }
-.suggestion-grid .q-btn:hover { background: white !important; }
+.suggestion-grid .q-btn:hover { background: var(--hover) !important; }
 
-.message-user { background: var(--user); border-radius: 18px; padding: 10px 15px; max-width: 75%; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.message-user { background: var(--user); border-radius: 20px; padding: 12px 18px; max-width: 75%; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 15px; }
 .user-message-group { width: 100%; max-width: 78%; margin-left: auto; gap: 7px !important; align-items: flex-end !important; }
 .sent-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px !important; }
 .sent-file-card { display: flex; align-items: center; gap: 9px; width: 210px; min-height: 58px; padding: 8px 10px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: white; }
@@ -322,14 +375,14 @@ body {
 .sent-image-preview { width: 112px !important; height: 88px !important; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
 .sent-image-preview img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 
-.message-ai { max-width: 85%; min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.message-ai { max-width: 85%; min-width: 0; overflow-wrap: anywhere; line-height: 1.6; font-size: 15px; color: #222; }
 .chat-scroll > .q-column, .chat-scroll > .q-row { width: 100%; min-width: 0; }
 .chat-scroll .message-ai { flex: 1 1 auto; }
-.message-ai .code-block { width: min(100%, 760px); margin: 8px 0; overflow: hidden; border: 1px solid #2f3338; border-radius: 9px; background: #17191c; color: #e8eaed; line-height: 1.45; }
+.message-ai .code-block { width: min(100%, 760px); margin: 12px 0; overflow: hidden; border: 1px solid #2f3338; border-radius: 12px; background: #17191c; color: #e8eaed; line-height: 1.45; }
 .message-ai .code-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 10px 0 14px; border-bottom: 1px solid #2f3338; background: #202328; color: #aeb4bd; font-family: "Segoe UI", Arial, sans-serif; font-size: 12px; }
 .message-ai .code-copy { padding: 5px 8px; border: 0; border-radius: 5px; background: transparent; color: #c6cbd2; cursor: pointer; font-size: 12px; }
 .message-ai .code-copy:hover { background: #343941; color: white; }
-.message-ai .code-block pre { margin: 0; padding: 10px 14px; overflow-x: auto; white-space: pre; }
+.message-ai .code-block pre { margin: 0; padding: 14px; overflow-x: auto; white-space: pre; }
 .message-ai .code-block code { color: inherit; font-family: Consolas, "Cascadia Code", monospace; font-size: 13px; }
 .message-ai.streaming::after { display: inline-block; width: 7px; height: 1.05em; margin-left: 3px; border-radius: 2px; background: #555; vertical-align: -.15em; content: ""; animation: typing-cursor 1s steps(2, start) infinite; }
 .thinking-label { color: var(--muted); font-style: italic; }
@@ -529,8 +582,6 @@ textarea.composer-textarea,
 .attachment-image img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 .attachment-document { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 7px; color: var(--muted); font-size: 10px; line-height: 1.2; text-align: center; word-break: break-word; }
 .composer .attachment-remove { position: absolute !important; top: 3px; right: 3px; z-index: 2; width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; max-width: 20px !important; max-height: 20px !important; padding: 0 !important; border: 1px solid rgba(255, 255, 255, .85) !important; background: rgba(25, 25, 25, .78) !important; color: white !important; font-size: 12px !important; }
-.chat-item { border-radius: 8px; }
-.chat-item:hover { background: var(--hover); }
 .small-muted { color: var(--muted); font-size: 12px; }
 pre { background: #171717; color: #f3f3f3; border-radius: 10px; padding: 14px; overflow-x: auto; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -562,7 +613,6 @@ document.addEventListener('keydown', (event) => {
 const resizeComposer = (textarea) => {
     if (!textarea) return;
     
-    // Reset to single line height first to get true scrollHeight
     textarea.style.setProperty('height', '24px', 'important');
     textarea.style.setProperty('overflow-y', 'hidden', 'important');
     
@@ -577,7 +627,6 @@ const resizeComposer = (textarea) => {
         'important'
     );
     
-    // Ensure Quasar wrappers do not expand unnecessarily
     const field = textarea.closest('.message-input');
     if (field) {
         field.style.setProperty('height', 'auto', 'important');
@@ -614,9 +663,7 @@ document.addEventListener('paste', (event) => {
     }
     if (!files.length) return;
 
-    const uploadInput = document.querySelector(
-        '.attachment-upload input[type="file"]'
-    );
+    const uploadInput = document.querySelector('.attachment-upload input[type="file"]');
     if (!uploadInput) return;
 
     event.preventDefault();
@@ -661,7 +708,7 @@ def add_chat_to_sidebar(title: str):
                 chat["title"],
                 on_click=lambda c=chat: load_chat(c),
             ).props("flat align=left").classes(
-                "chat-item w-full normal-case justify-start"
+                "chat-item w-full normal-case justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
             )
             if chat["id"] == active_chat_id:
                 button.classes(add="chat-item-active")
@@ -1148,7 +1195,7 @@ sidebar_collapsed = False
 def toggle_sidebar():
     global sidebar_collapsed
     sidebar_collapsed = not sidebar_collapsed
-    sidebar_panel.set_visibility(not sidebar_collapsed)
+    sidebar_container.set_visibility(not sidebar_collapsed)
     sidebar_open_button.set_visibility(sidebar_collapsed)
 
 
@@ -1182,78 +1229,62 @@ async def refresh_model_menu():
 
 with ui.row().classes("w-full h-screen gap-0 no-wrap"):
 
-    # ---------------- Sidebar ----------------
-    sidebar_panel = ui.column().classes(
-        "desktop-sidebar sidebar h-full shrink-0"
-    )
-    with sidebar_panel:
+    # ---------------- Dual Sidebar Container ----------------
+    sidebar_container = ui.row().classes("desktop-sidebar h-full shrink-0 no-wrap gap-0")
+    
+    with sidebar_container:
+        # 1. Left Thin Rail
+        with ui.column().classes("sidebar-rail h-full justify-between items-center py-3 px-1.5 shrink-0"):
+            with ui.column().classes("gap-2 items-center w-full"):
+                ui.button(icon="home").props("flat dense").classes("rail-btn rail-btn-active")
+                ui.button(icon="schedule").props("flat dense").classes("rail-btn")
+                ui.button(icon="library_books").props("flat dense").classes("rail-btn")
+                ui.button(icon="image").props("flat dense").classes("rail-btn")
+                ui.button(icon="extension").props("flat dense").classes("rail-btn")
+                ui.button(icon="more_horiz").props("flat dense").classes("rail-btn")
+            
+            with ui.column().classes("gap-3 items-center w-full mt-auto"):
+                ui.button(icon="help_outline").props("flat dense").classes("rail-btn")
+                
+                profile_rail_avatar = ui.button("U").props("flat dense").classes("rail-avatar")
+                with profile_rail_avatar:
+                    with ui.menu().classes("w-48 shadow-lg rounded-xl overflow-hidden mt-2 ml-2"):
+                        with ui.column().classes("w-full p-3 gap-0 bg-white"):
+                            profile_menu_name = ui.label("Guest").classes("text-sm font-semibold text-gray-900")
+                            profile_menu_email = ui.label("Sign in to save chats").classes("text-xs text-gray-500 mb-2")
+                        ui.separator()
+                        ui.menu_item("Settings", on_click=open_settings).classes("text-[13px] py-2")
+                        auth_menu_item = ui.menu_item("Sign in", on_click=handle_auth_action).classes("text-[13px] py-2")
 
-        with ui.row().classes(
-            "sidebar-brand w-full items-center justify-between no-wrap"
-        ):
-            ui.label("Saumya AI").classes("sidebar-brand-title")
-            ui.button(icon="side_navigation", on_click=toggle_sidebar).props(
-                "flat round dense aria-label='Toggle sidebar'"
-            )
+        # 2. Right Wide Panel
+        sidebar_panel = ui.column().classes("sidebar-panel h-full py-3 px-3")
+        with sidebar_panel:
+            
+            # Header row (Title + icons)
+            with ui.row().classes("w-full items-center justify-between mb-3 no-wrap px-1"):
+                ui.label("Saumya AI").classes("text-lg font-semibold tracking-tight text-[#222]")
+                with ui.row().classes("gap-0.5 no-wrap"):
+                    ui.button(icon="search", on_click=lambda: search_dialog.open()).props("flat round dense").classes("panel-header-icon")
+                    ui.button(icon="view_sidebar", on_click=toggle_sidebar).props("flat round dense").classes("panel-header-icon")
 
-        with ui.column().classes("sidebar-primary w-full"):
-            ui.button(
-                "New chat",
-                icon="edit_square",
-                on_click=new_chat,
-            ).props("flat align=left").classes(
-                "w-full normal-case"
-            )
+            # Scrollable section content
+            with ui.column().classes("w-full flex-1 sidebar-scroll gap-0"):
+                ui.button("New chat", icon="edit_square", on_click=new_chat).props("flat align=left").classes("sidebar-btn")
+                
+                ui.label("Pinned").classes("section-label")
+                ui.button("Important Notes", icon="folder_open").props("flat align=left").classes("sidebar-btn")
+                
+                ui.label("Projects").classes("section-label")
+                ui.button("Workspace", icon="folder_open", on_click=lambda: ui.navigate.to("/builder")).props("flat align=left").classes("sidebar-btn")
+                
+                ui.label("Recents").classes("section-label")
+                chat_list = ui.column().classes("chat-list w-full")
 
-            ui.button(
-                "Search chats",
-                icon="search",
-                on_click=lambda: search_dialog.open(),
-            ).props("flat align=left").classes(
-                "w-full normal-case"
-            )
-
-            ui.button(
-                "Projects",
-                icon="folder_open",
-                on_click=lambda: ui.navigate.to("/builder"),
-            ).props("flat align=left").classes(
-                "w-full normal-case"
-            )
-
-        ui.label("Recents").classes("recents-label")
-
-        chat_list = ui.column().classes("chat-list w-full")
-
-        with ui.column().classes("sidebar-footer w-full"):
-            ui.separator()
-
-            ui.button(
-                "Settings",
-                icon="settings",
-                on_click=open_settings,
-            ).props("flat align=left").classes(
-                "w-full normal-case"
-            )
-
-            with ui.row().classes("profile-row items-center"):
-                profile_avatar = ui.label("P").classes(
-                    "bg-black text-white rounded-full "
-                    "w-8 h-8 flex items-center justify-center font-bold"
-                )
-                with ui.column().classes("gap-0"):
-                    profile_name = ui.label("User").classes("text-sm font-semibold profile-display-name")
-                    profile_email = ui.label("Saumya AI").classes("small-muted")
-                auth_action_button = ui.button(
-                    "Sign in",
-                    on_click=handle_auth_action,
-                ).props("flat dense").classes("normal-case text-xs ml-auto")
-
-    # ---------------- Main ----------------
+    # ---------------- Main Chat Canvas ----------------
     with ui.column().classes("chat-main flex-1 h-full min-w-0 gap-0"):
 
         sidebar_open_button = ui.button(
-            icon="side_navigation",
+            icon="view_sidebar",
             on_click=toggle_sidebar,
         ).props(
             "flat round dense aria-label='Open sidebar'"
@@ -1263,13 +1294,15 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
         with ui.row().classes(
             "chat-header w-full items-center px-5"
         ):
-            model_button = ui.button(f"{selected_model}  ▾").props("flat").classes(
-                "font-semibold normal-case"
-            )
-            with model_button:
-                with ui.menu().classes("model-menu") as model_menu:
-                    with ui.column().classes("model-menu-scroll gap-0") as model_options_container:
-                        ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
+            # Model selection at the top left of the chat canvas
+            with ui.row().classes("ml-8 mt-1"):  # Offset slightly to allow space for the open-sidebar button
+                model_button = ui.button(f"{selected_model}  ▾").props("flat").classes(
+                    "font-semibold normal-case text-gray-600"
+                )
+                with model_button:
+                    with ui.menu().classes("model-menu") as model_menu:
+                        with ui.column().classes("model-menu-scroll gap-0") as model_options_container:
+                            ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
 
         messages_container = ui.column().classes(
             "chat-scroll flex-1 w-full px-4 pb-32"
@@ -1380,6 +1413,7 @@ with ui.dialog() as search_dialog, ui.card().classes("w-[600px] max-w-[90vw]"):
 
 
 ui.timer(0.1, refresh_model_menu, once=True)
+ui.timer(0.2, refresh_profile_display, once=True) # Run to populate initial profile state
 
 
 # ============================================================
@@ -1494,7 +1528,6 @@ def submit_auth():
         if pending_auth_prompt:
             message_input.value = pending_auth_prompt
             message_input.run_method("focus")
-        auth_action_button.set_text("Logout")
         refresh_profile_display()
         ui.notify(f"Signed in as {email}", type="positive")
     except ValueError as error:

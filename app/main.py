@@ -279,7 +279,7 @@ body {
 .rail-avatar::before { box-shadow: none !important; }
 
 .sidebar-panel {
-    width: 260px !important;
+    width: 207px !important;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
 }
@@ -325,8 +325,10 @@ body {
 .sidebar-btn .q-btn__content { flex-wrap: nowrap !important; justify-content: flex-start !important; }
 
 .chat-list { flex: 1 1 auto; min-height: 0; gap: 2px !important; }
-.chat-list .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.chat-list .q-btn__content { display: block; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; padding: 8px 5px;}
 .chat-item-active { background: var(--active) !important; font-weight: 500; color: #000 !important; }
+.chat-action { flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; color: #85817a !important; opacity: .7; }
+.chat-action:hover { opacity: 1; background: var(--hover) !important; color: var(--text) !important; }
 
 .sidebar-open-button {
     position: absolute !important;
@@ -587,7 +589,24 @@ pre { background: #171717; color: #f3f3f3; border-radius: 10px; padding: 14px; o
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
 @media (max-width: 800px) {
-    .desktop-sidebar { display: none !important; }
+    .desktop-sidebar { display: flex !important; }
+    .sidebar-rail { width: 52px !important; }
+    .sidebar-panel {
+        position: fixed !important;
+        top: 0;
+        bottom: 0;
+        left: 52px;
+        z-index: 20;
+        width: min(260px, calc(100vw - 52px)) !important;
+        box-shadow: 8px 0 24px rgba(0, 0, 0, .12);
+    }
+    .sidebar-open-button {
+        top: 10px;
+        left: 62px;
+        z-index: 25;
+        background: rgba(255, 255, 255, .94) !important;
+    }
+    .chat-main { width: calc(100vw - 52px) !important; }
     .message-user { max-width: 90%; }
     .chat-scroll { padding: 16px 12px 170px !important; }
     .composer-layer { padding: 42px 12px 10px !important; }
@@ -704,14 +723,43 @@ def add_chat_to_sidebar(title: str):
 
     for chat in chats:
         with chat_list:
-            button = ui.button(
-                chat["title"],
-                on_click=lambda c=chat: load_chat(c),
-            ).props("flat align=left").classes(
-                "chat-item w-full normal-case justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
-            )
-            if chat["id"] == active_chat_id:
-                button.classes(add="chat-item-active")
+            with ui.row().classes("chat-item w-full items-center no-wrap gap-1 px-1"):
+                button = ui.button(
+                    chat["title"],
+                    on_click=lambda c=chat: load_chat(c),
+                ).props("flat align=left").classes(
+                    "flex-1 min-w-0 normal-case justify-start px-2 py-1.5 min-h-[34px] rounded-lg text-[13px] text-[#333]"
+                )
+                if chat["id"] == active_chat_id:
+                    button.classes(add="chat-item-active")
+                ui.button(
+                    icon="push_pin" if chat.get("pinned") else "push_pin_outlined",
+                    on_click=lambda c=chat: toggle_pin(c),
+                ).props("flat round dense aria-label='Pin chat'").classes("chat-action")
+                ui.button(
+                    icon="delete_outline",
+                    on_click=lambda c=chat: delete_chat(c),
+                ).props("flat round dense aria-label='Delete chat'").classes("chat-action")
+
+
+def toggle_pin(chat: dict):
+    pinned = not bool(chat.get("pinned"))
+    db.set_conversation_pinned(current_user_id(), chat["id"], pinned)
+    chat["pinned"] = int(pinned)
+    chats.sort(key=lambda item: (not bool(item.get("pinned")), item["id"] != active_chat_id, -item["id"]))
+    add_chat_to_sidebar("")
+
+
+def delete_chat(chat: dict):
+    global active_chat_id, current_messages
+    db.delete_user_conversation(current_user_id(), chat["id"])
+    chats[:] = [item for item in chats if item["id"] != chat["id"]]
+    if active_chat_id == chat["id"]:
+        active_chat_id = None
+        current_messages = []
+        render_messages()
+    add_chat_to_sidebar("")
+    ui.notify("Chat deleted", type="positive")
 
 
 def render_messages():

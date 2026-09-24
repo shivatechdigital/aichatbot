@@ -35,6 +35,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS conversations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
+                    pinned INTEGER NOT NULL DEFAULT 0,
                     title TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -97,6 +98,10 @@ class Database:
             }
             if "user_id" not in conversation_columns:
                 connection.execute("ALTER TABLE conversations ADD COLUMN user_id INTEGER")
+            if "pinned" not in conversation_columns:
+                connection.execute(
+                    "ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"
+                )
             user_columns = {
                 row[1] for row in connection.execute("PRAGMA table_info(users)")
             }
@@ -287,12 +292,12 @@ class Database:
             if user_id is None:
                 rows = connection.execute(
                     "SELECT id, title, created_at FROM conversations "
-                    "ORDER BY updated_at DESC, id DESC"
+                    "ORDER BY pinned DESC, updated_at DESC, id DESC"
                 ).fetchall()
             else:
                 rows = connection.execute(
-                    "SELECT id, title, created_at FROM conversations "
-                    "WHERE user_id = ? ORDER BY updated_at DESC, id DESC",
+                    "SELECT id, title, created_at, pinned FROM conversations "
+                    "WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC, id DESC",
                     (user_id,),
                 ).fetchall()
             return [dict(row) for row in rows]
@@ -300,6 +305,25 @@ class Database:
     def delete_conversation(self, conversation_id: int) -> None:
         with self.get_connection() as connection:
             connection.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+            connection.commit()
+
+    def delete_user_conversation(self, user_id: int, conversation_id: int) -> None:
+        with self.get_connection() as connection:
+            connection.execute(
+                "DELETE FROM conversations WHERE id = ? AND user_id = ?",
+                (conversation_id, user_id),
+            )
+            connection.commit()
+
+    def set_conversation_pinned(
+        self, user_id: int, conversation_id: int, pinned: bool
+    ) -> None:
+        with self.get_connection() as connection:
+            connection.execute(
+                "UPDATE conversations SET pinned = ?, updated_at = updated_at "
+                "WHERE id = ? AND user_id = ?",
+                (int(pinned), conversation_id, user_id),
+            )
             connection.commit()
 
     def create_project(self, name: str = "Untitled website") -> int:

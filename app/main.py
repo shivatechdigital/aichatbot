@@ -125,7 +125,6 @@ active_chat_id = None
 pending_attachments = []
 generation_task = None
 generation_cancelled = False
-pending_auth_prompt = ""
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
@@ -153,7 +152,19 @@ def current_user_id() -> int:
 
 def logout():
     app.storage.user.clear()
+    app.storage.client.pop("pending_auth_prompt", None)
     ui.run_javascript("location.reload()")
+
+
+def open_auth_dialog():
+    auth_dialog.open()
+
+
+def handle_auth_action():
+    if logged_in_user():
+        logout()
+    else:
+        open_auth_dialog()
 
 
 chats = []
@@ -961,7 +972,7 @@ def render_messages():
                     "text-3xl border rounded-full w-12 h-12 "
                     "flex items-center justify-center"
                 )
-                ui.label("How can I help you?").classes(
+                ui.label("How can I help you buddy?").classes(
                     "text-3xl font-semibold mt-4"
                 )
                 ui.label(
@@ -1276,7 +1287,7 @@ async def stream_llm(messages, model=None):
 
 async def send_message():
     global current_messages, pending_attachments, selected_model
-    global generation_task, generation_cancelled, pending_auth_prompt
+    global generation_task, generation_cancelled
 
     text = message_input.value.strip()
 
@@ -1284,7 +1295,7 @@ async def send_message():
         return
 
     if not logged_in_user():
-        pending_auth_prompt = text
+        app.storage.client["pending_auth_prompt"] = text
         auth_dialog.open()
         ui.notify("Please sign in to send this message.", type="warning")
         return
@@ -1523,9 +1534,10 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                 with ui.column().classes("gap-0"):
                     ui.label("Saumya").classes("text-sm font-semibold")
                     ui.label("Saumya AI").classes("small-muted")
-                ui.button("Logout", on_click=logout).props("flat dense").classes(
-                    "normal-case text-xs ml-auto"
-                )
+                auth_action_button = ui.button(
+                    "Logout" if logged_in_user() else "Sign in",
+                    on_click=handle_auth_action,
+                ).props("flat dense").classes("normal-case text-xs ml-auto")
 
     # ---------------- Main ----------------
     with ui.column().classes("chat-main flex-1 h-full min-w-0 gap-0"):
@@ -1686,7 +1698,7 @@ def update_auth_mode(mode: str):
 
 
 def submit_auth():
-    global chats, current_messages, active_chat_id, chat_counter, pending_auth_prompt
+    global chats, current_messages, active_chat_id, chat_counter
     try:
         if auth_mode["value"] == "signup":
             user_id = db.create_user(auth_email.value, auth_password.value)
@@ -1705,10 +1717,11 @@ def submit_auth():
         add_chat_to_sidebar("")
         render_messages()
         auth_dialog.close()
+        pending_auth_prompt = app.storage.client.pop("pending_auth_prompt", "")
         if pending_auth_prompt:
             message_input.value = pending_auth_prompt
-            pending_auth_prompt = ""
             message_input.run_method("focus")
+        auth_action_button.set_text("Logout")
         ui.notify(f"Signed in as {email}", type="positive")
     except ValueError as error:
         ui.notify(str(error), type="negative")

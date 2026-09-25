@@ -109,6 +109,14 @@ async def discover_models() -> list[str]:
     return discovered_models
 
 selected_model = "Auto" if LLM_MODEL.lower() == "auto" else LLM_MODEL
+selected_effort = "medium"
+EFFORT_OPTIONS = {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "xhigh": "Extra",
+    "max": "Max",
+}
 
 # ============================================================
 # State
@@ -1182,7 +1190,7 @@ class ModelUnavailableError(RuntimeError):
     """Raised when the backend rejects the requested model."""
 
 
-async def stream_llm(messages, model=None):
+async def stream_llm(messages, model=None, effort=None):
     payload = {
         "messages": messages,
         "temperature": 0.2,
@@ -1191,6 +1199,7 @@ async def stream_llm(messages, model=None):
     requested_model = selected_model if model is None else model
     if requested_model.lower() != "auto":
         payload["model"] = requested_model
+    payload["reasoning_effort"] = effort or selected_effort
 
     headers = {}
     api_key = config.API_KEY.strip()
@@ -1410,6 +1419,13 @@ def select_model(name: str):
     model_menu.close()
 
 
+def select_effort(value: str):
+    global selected_effort
+    selected_effort = value
+    effort_button.set_text(f"{EFFORT_OPTIONS[value]}  ▾")
+    effort_menu.close()
+
+
 async def refresh_model_menu():
     model_ids = await discover_models()
     configured_options = configured_model_options()
@@ -1509,6 +1525,17 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     with ui.menu().classes("model-menu") as model_menu:
                         with ui.column().classes("model-menu-scroll gap-0") as model_options_container:
                             ui.menu_item("Auto", on_click=lambda: select_model("Auto"))
+                effort_button = ui.button("Medium  ▾").props("flat").classes(
+                    "font-semibold normal-case text-gray-600"
+                )
+                with effort_button:
+                    with ui.menu().classes("model-menu") as effort_menu:
+                        ui.label("Higher effort is slower but more thorough").classes("small-muted px-3 py-2")
+                        for effort_value, effort_label in EFFORT_OPTIONS.items():
+                            ui.menu_item(
+                                effort_label,
+                                on_click=lambda value=effort_value: select_effort(value),
+                            )
 
         messages_container = ui.column().classes(
             "chat-scroll flex-1 w-full px-4 pb-32"

@@ -81,6 +81,12 @@ PHRASES = [
 BASE_RULES = """You are a world-class senior product designer and front-end engineer.
 Build a PRODUCTION-QUALITY, fully responsive result for the request below.
 
+DEFAULT COMPLETENESS: Even if the user gives a short prompt, expand it into a complete, attractive website with substantial realistic content. Never return a tiny demo or a bare hero section.
+- Include a complete navigation, hero, 5-8 meaningful content sections, testimonials or social proof, FAQ, contact/CTA, footer, and mobile navigation.
+- Use specific believable copy, realistic sample data, useful interactions, responsive states, hover/focus states, and polished visual hierarchy.
+- For a business website, include About, Services/Features, Gallery or portfolio, pricing/menu/catalog where relevant, testimonials, FAQ, contact, and footer.
+- For a dashboard or admin request, include seeded data, filters, forms, empty/loading/error states, and working CRUD-style interactions.
+
 HARD RULES
 - Return ONLY file blocks in the exact format shown below. No explanations, nothing outside file blocks.
 - Every file must be COMPLETE. No placeholders, no "...", no TODO, no lorem ipsum. Write rich, believable copy and data.
@@ -100,7 +106,7 @@ def _contract(kind: str) -> str:
     if kind == "website":
         return (
             "PROJECT TYPE: multi-file static website.\n"
-            "Files: index.html, style.css, script.js (+ optional extra pages such as about.html or admin.html that share style.css/script.js). "
+            "Files: index.html, style.css, script.js, plus about.html, services.html, contact.html, and any relevant page files. "
             "Max 8 files. Use relative links only (href=\"style.css\", href=\"about.html\"). Plain HTML/CSS/vanilla JS."
         )
     extra = ""
@@ -114,7 +120,7 @@ def _contract(kind: str) -> str:
         "PROJECT TYPE: React 18 single page app.\n"
         "Files: index.html (only <div id=\"root\"></div>, meta tags and font links), package.json, src/main.jsx "
         "(createRoot(...).render(<App/>)), src/App.jsx, src/styles.css (imported from main.jsx), plus src/components/*.jsx, "
-        "src/pages/*.jsx, src/data/*.js as needed. Max 16 files.\n"
+        "src/pages/*.jsx, src/data/*.js as needed. Include multiple views/pages and realistic seeded content. Max 16 files.\n"
         "IMPORT RULES: the ONLY package imports allowed are 'react', 'react-dom' and 'react-dom/client'. "
         "Do NOT use react-router or any other package - implement routing yourself with window.location.hash + useState/useEffect. "
         "Every relative import must point to a file you output. Use function components and hooks." + extra
@@ -204,6 +210,10 @@ def _resolve(files: dict[str, str], base: str, spec: str) -> str | None:
 def _problems(files: dict[str, str]) -> list[str]:
     out: list[str] = []
     if _is_react(files):
+        required = {"index.html", "package.json", "src/styles.css"}
+        missing_required = sorted(required - set(files))
+        if missing_required:
+            out.append("required production files missing: " + ", ".join(missing_required))
         entries = ("src/main.jsx", "src/main.js", "src/main.tsx", "src/index.jsx", "src/index.js", "src/App.jsx", "src/App.js", "src/App.tsx")
         if not any(p in files for p in entries):
             out.append("entry file missing: src/main.jsx or src/App.jsx")
@@ -226,6 +236,8 @@ def _problems(files: dict[str, str]) -> list[str]:
                     t = posixpath.normpath(posixpath.join(posixpath.dirname(p), ref.lstrip("/")))
                     if t not in files:
                         out.append(f"{p}: references missing file '{ref}'")
+    if len(files) < (5 if _is_react(files) else 3):
+        out.append("generated project is too small for the selected production mode")
     return out[:20]
 
 

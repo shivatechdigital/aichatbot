@@ -29,6 +29,8 @@ Edit `.env`. Leave `API_KEY` empty for a local server without authentication.
 Keep `MODEL_NAME=auto` to select the first model returned by `/v1/models`, or set
 an explicit model ID.
 
+`REQUEST_TIMEOUT=600` allows the Builder to finish large multi-file generations.
+
 When the app runs in Docker, Compose automatically uses
 `http://host.docker.internal:3010/v1/chat/completions`.
 

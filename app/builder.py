@@ -552,7 +552,7 @@ async def _load_models() -> list[str]:
         return _MODEL_CACHE
     try:
         m = _main_mod()
-        ids = await m.discover_models()
+        ids = await asyncio.wait_for(m.discover_models(), timeout=5)
         if not ids:
             ids = list(m.configured_model_options().keys())
     except Exception:
@@ -1740,20 +1740,6 @@ def builder_page():
     async def _start(text: str) -> None:
         if S["status"] == "generating":
             return
-        available_models = _quality_models(await _load_models())
-        available_models = [
-            model for model in available_models
-            if model and model.lower() != "auto"
-        ]
-        if available_models:
-            random_models = [secrets.choice(available_models) for _ in "AB"]
-            if len(available_models) > 1:
-                random_models[1] = secrets.choice(
-                    [model for model in available_models if model != random_models[0]]
-                )
-            for option, model in zip("AB", random_models):
-                if S["models"][option] == "default":
-                    S["models"][option] = model
         S.update(prompt=text, title=_title_from_prompt(text), kind=_detect_kind(text), status="generating",
                  voted=None, single=False, opt="A", chat=[], refining=False, editing=False,
                  urls={"A": "", "B": ""}, pids={"A": None, "B": None}, files={"A": {}, "B": {}},
@@ -1773,6 +1759,21 @@ def builder_page():
         _sync_input()
         _sync_tabs()
         R["tick"].active = True
+        _tick(force=True)
+
+        available_models = _quality_models(await _load_models())
+        available_models = [model for model in available_models if model and model.lower() != "auto"]
+        if available_models:
+            random_models = [secrets.choice(available_models) for _ in "AB"]
+            if len(available_models) > 1:
+                random_models[1] = secrets.choice(
+                    [model for model in available_models if model != random_models[0]]
+                )
+            for option, model in zip("AB", random_models):
+                if S["models"][option] == "default":
+                    S["models"][option] = model
+        S["mname"] = {o: _resolve_model(S["models"][o]) for o in "AB"}
+        _render_chat()
         await asyncio.gather(_gen_one("A"), _gen_one("B"))
         R["tick"].active = False
         _show(R["banner"], False)

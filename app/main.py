@@ -145,6 +145,27 @@ def logged_in_user() -> dict | None:
     )
 
 
+async def restore_persistent_session():
+    token = await ui.run_javascript("localStorage.getItem('saumya_session')")
+    if not token or logged_in_user():
+        return
+    user = db.get_user_by_session(token)
+    if not user:
+        await ui.run_javascript("localStorage.removeItem('saumya_session')")
+        return
+    nicegui_context.client.storage.update(
+        {**user, "session_token": token}
+    )
+    global chats, current_messages, active_chat_id, chat_counter
+    chats = load_persisted_chats(user["id"])
+    current_messages = []
+    active_chat_id = None
+    chat_counter = max((chat["id"] for chat in chats), default=0) + 1
+    add_chat_to_sidebar("")
+    render_messages()
+    refresh_profile_display()
+
+
 def current_user_id() -> int:
     user = logged_in_user()
     if not user:
@@ -153,7 +174,11 @@ def current_user_id() -> int:
 
 
 def logout():
+    token = nicegui_context.client.storage.get("session_token")
+    if token:
+        db.delete_session(token)
     nicegui_context.client.storage.clear()
+    ui.run_javascript("localStorage.removeItem('saumya_session')")
     refresh_profile_display()
     ui.run_javascript("location.reload()")
 
@@ -1595,6 +1620,7 @@ with ui.dialog() as search_dialog, ui.card().classes("w-[600px] max-w-[90vw]"):
 
 ui.timer(0.1, refresh_model_menu, once=True)
 ui.timer(0.2, refresh_profile_display, once=True) # Run to populate initial profile state
+ui.timer(0.3, restore_persistent_session, once=True)
 
 
 # ============================================================
@@ -1698,6 +1724,11 @@ def submit_auth():
         nicegui_context.client.storage["user_id"] = user_id
         nicegui_context.client.storage["email"] = email
         nicegui_context.client.storage["display_name"] = display_name
+        session_token = db.create_session(user_id)
+        nicegui_context.client.storage["session_token"] = session_token
+        ui.run_javascript(
+            f"localStorage.setItem('saumya_session', {json.dumps(session_token)})"
+        )
         chats = load_persisted_chats(user_id)
         current_messages = []
         active_chat_id = None

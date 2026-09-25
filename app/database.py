@@ -91,6 +91,13 @@ class Database:
                     password_hash TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    token_hash TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
                 """
             )
             conversation_columns = {
@@ -156,6 +163,38 @@ class Database:
         if not row or not self._verify_password(password, row["password_hash"]):
             return None
         return {"id": row["id"], "email": row["email"], "display_name": row["display_name"]}
+
+    @staticmethod
+    def _session_hash(token: str) -> str:
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def create_session(self, user_id: int) -> str:
+        token = secrets.token_urlsafe(48)
+        with self.get_connection() as connection:
+            connection.execute(
+                "INSERT INTO user_sessions (token_hash, user_id) VALUES (?, ?)",
+                (self._session_hash(token), user_id),
+            )
+            connection.commit()
+        return token
+
+    def get_user_by_session(self, token: str) -> dict | None:
+        with self.get_connection() as connection:
+            row = connection.execute(
+                "SELECT users.id, users.email, users.display_name "
+                "FROM user_sessions JOIN users ON users.id = user_sessions.user_id "
+                "WHERE user_sessions.token_hash = ?",
+                (self._session_hash(token),),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_session(self, token: str) -> None:
+        with self.get_connection() as connection:
+            connection.execute(
+                "DELETE FROM user_sessions WHERE token_hash = ?",
+                (self._session_hash(token),),
+            )
+            connection.commit()
 
     def update_user_profile(self, user_id: int, display_name: str, email: str) -> dict:
         display_name = display_name.strip()

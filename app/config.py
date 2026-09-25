@@ -23,7 +23,7 @@ class Config:
     MODEL_NAME = os.getenv("MODEL_NAME", "auto")
     TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2048"))
-    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "120"))
+    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "600"))
 
     APP_NAME = os.getenv("APP_NAME", "Quotation AI Arena")
     APP_PORT = int(os.getenv("APP_PORT", "7860"))

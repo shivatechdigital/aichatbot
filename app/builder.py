@@ -803,6 +803,11 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-mode.on,.da-type.on{background:#e8e6e1;color:var(--ink);border-color:#cfcbc2;font-weight:500}
 .da-mode-copy{display:flex;flex-direction:column;gap:2px;text-align:left}
 .da-mode-description{max-width:210px;color:var(--muted);font-size:11px;line-height:1.25;font-weight:400}
+.da-build-modes{display:flex;justify-content:center;gap:10px;margin:16px auto 0;max-width:620px}
+.da-build-mode{flex:1;max-width:290px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer;text-align:left}
+.da-build-mode.on{border-color:var(--teal);background:var(--tealBg);box-shadow:0 2px 8px rgba(74,125,119,.12)}
+.da-build-mode-title{display:block;color:var(--ink);font-weight:600;font-size:14px}
+.da-build-mode-copy{display:block;color:var(--muted);font-size:12px;margin-top:3px}
 .da-sugs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;max-width:900px}
 .da-sug{font-family:inherit;border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 15px;font-size:13.5px;color:var(--ink2);cursor:pointer;transition:.15s}
 .da-sug:hover{background:#fff;border-color:var(--line2)}
@@ -1036,7 +1041,7 @@ def builder_page():
     user_name, user_initial = _user_display()
 
     S: dict = {
-        "type": "website", "kind": "website", "status": "idle", "opt": "A", "view": "preview",
+        "type": "website", "kind": "website", "build_mode": "battle", "status": "idle", "opt": "A", "view": "preview",
         "prompt": "", "title": "", "voted": None, "single": False, "refining": False, "editing": False,
         "models": {"A": "default", "B": "default"}, "mname": {"A": "Auto", "B": "Auto"},
         "files": {"A": {}, "B": {}}, "tokens": {"A": "", "B": ""}, "urls": {"A": "", "B": ""},
@@ -1770,7 +1775,7 @@ def builder_page():
         if S["status"] == "generating":
             return
         S.update(prompt=text, title=_title_from_prompt(text), kind=_detect_kind(text), status="generating",
-                 voted=None, single=False, opt="A", chat=[], refining=False, editing=False,
+                 voted=None, single=S["build_mode"] == "direct", opt="A", chat=[], refining=False, editing=False,
                  urls={"A": "", "B": ""}, pids={"A": None, "B": None}, files={"A": {}, "B": {}},
                  tabs={"A": [], "B": []}, sel={"A": None, "B": None}, logs={"A": [], "B": []},
                  filter="", t0=time.time(), phrase_i=0, ver=S["ver"] + 1)
@@ -1801,11 +1806,14 @@ def builder_page():
             for option, model in zip("AB", random_models):
                 if S["models"][option] == "default":
                     S["models"][option] = model
+        if S["single"] and S["models"]["A"] == "default":
+            S["models"]["A"] = "default"
         S["mname"] = {o: _resolve_model(S["models"][o]) for o in "AB"}
         _render_chat()
         # Keep the host Copilot CLI from handling two heavyweight generations at once.
         await _gen_one("A")
-        await _gen_one("B")
+        if not S["single"]:
+            await _gen_one("B")
         R["tick"].active = False
         _show(R["banner"], False)
         ok = [o for o in "AB" if S["prog"][o]["state"] == "done"]
@@ -1968,6 +1976,11 @@ def builder_page():
         for key in KINDS:
             _cls(R[f"mode_{key}"], "on", key == k)
 
+    def _set_build_mode(mode: str) -> None:
+        S["build_mode"] = mode
+        _cls(R["build_battle"], "on", mode == "battle")
+        _cls(R["build_direct"], "on", mode == "direct")
+
     def _use_suggestion(text: str) -> None:
         R["inp"].value = text
         R["inp"].run_method("focus")
@@ -2033,6 +2046,17 @@ def builder_page():
                             _btn("da-round", "cloud", title="Import a .zip / .html project",
                                  js="() => document.querySelector('.da-up-imp input[type=file]').click()", size=22)
                         _btn("da-send", "up", on_click=_submit, title="Generate", size=24)
+                with _div("da-build-modes"):
+                    R["build_battle"] = _div("da-build-mode on")
+                    R["build_battle"].on("click", lambda _e=None: _set_build_mode("battle"))
+                    with R["build_battle"]:
+                        ui.label("Battle").classes("da-build-mode-title")
+                        ui.label("Two models, compare both designs").classes("da-build-mode-copy")
+                    R["build_direct"] = _div("da-build-mode")
+                    R["build_direct"].on("click", lambda _e=None: _set_build_mode("direct"))
+                    with R["build_direct"]:
+                        ui.label("Direct").classes("da-build-mode-title")
+                        ui.label("Choose one model and build once").classes("da-build-mode-copy")
                 with _div("da-modes"):
                     for k, lab in KINDS.items():
                         m = _div("da-mode" + (" on" if k == S["type"] else ""))

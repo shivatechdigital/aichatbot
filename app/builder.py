@@ -806,6 +806,8 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-rc:hover{border-color:var(--teal);background:#fbfdfc}
 .da-rc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .da-rc .pill{font-size:11px;color:var(--tealD);background:var(--tealBg);border-radius:999px;padding:2px 8px}
+.da-project-delete{margin-left:auto;color:#8b5a54!important;flex:0 0 28px}
+.da-project-delete:hover{background:#f8e8e5!important;color:#7b2920!important}
 
 /* work layout */
 .da-work{position:absolute;inset:0;display:flex;--chat-w:42%}
@@ -1098,6 +1100,22 @@ def builder_page():
                         _icon("folder", 18)
                         ui.label(str(p.get("name", "Untitled"))).classes("nm")
                         ui.label("open").classes("pill")
+                        delete_button = _btn(
+                            "da-project-delete", "x", title="Delete design", size=16
+                        )
+                        delete_button.on(
+                            "click.stop",
+                            lambda _e=None, pid=p["id"]: _delete_project(pid),
+                        )
+
+    def _delete_project(project_id: int) -> None:
+        try:
+            db.delete_project(project_id)
+            _render_recent()
+            _refresh_stats()
+            ui.notify("Design deleted", type="positive")
+        except Exception as exc:
+            ui.notify(f"Delete failed: {exc}", type="negative")
 
     def _render_attach() -> None:
         box = R["attached"]

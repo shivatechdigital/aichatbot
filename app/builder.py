@@ -820,6 +820,10 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-build-mode.on{border-color:var(--teal);background:var(--tealBg);box-shadow:0 2px 8px rgba(74,125,119,.12)}
 .da-build-mode-title{display:block;color:var(--ink);font-weight:600;font-size:14px}
 .da-build-mode-copy{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.da-model-choice{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;color:var(--muted);font-size:12px}
+.da-model-choice-label{font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.da-model-choice-button{border:1px solid var(--line)!important;background:#fff!important;color:var(--ink)!important;padding:8px 14px!important;border-radius:999px!important}
+.da-model-choice-button:hover{border-color:var(--teal)!important;background:var(--tealBg)!important}
 .da-sugs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;max-width:900px}
 .da-sug{font-family:inherit;border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 15px;font-size:13.5px;color:var(--ink2);cursor:pointer;transition:.15s}
 .da-sug:hover{background:#fff;border-color:var(--line2)}
@@ -2069,6 +2073,16 @@ def builder_page():
                     with R["build_direct"]:
                         ui.label("Direct").classes("da-build-mode-title")
                         ui.label("Choose one model and build once").classes("da-build-mode-copy")
+                with _div("da-model-choice"):
+                    ui.label("Model").classes("da-model-choice-label")
+                    _btn(
+                        "da-model-choice-button",
+                        "spark",
+                        text="Choose models",
+                        on_click=_open_models,
+                        title="Choose the model for each option",
+                        size=16,
+                    )
                 with _div("da-modes"):
                     for k, lab in KINDS.items():
                         m = _div("da-mode" + (" on" if k == S["type"] else ""))

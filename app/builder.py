@@ -752,7 +752,7 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 
 /* home */
 .da-home{position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto}
-.da-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 24px 48px;min-height:560px}
+.da-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 24px 48px;min-height:auto}
 .da-h1{font-family:var(--serif);font-size:56px;font-weight:500;letter-spacing:-1.3px;margin:0 0 14px;text-align:center;line-height:1.05}
 .da-sub{display:flex;align-items:center;gap:9px;color:var(--mute);font-size:16px;margin-bottom:34px}
 .da-sub b{font-family:var(--serif);font-weight:500;color:#3a3935;font-size:18px}
@@ -808,7 +808,7 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-types{display:flex;gap:12px;flex-wrap:wrap}
 .da-type{cursor:default;padding:6px 16px 6px 6px}
 .da-type:not(.on){opacity:.6}
-.da-arow{display:flex;gap:16px;align-items:flex-start}
+.da-arow{margin-top:30px;display:flex;gap:16px;align-items:flex-start}
 .da-orb{flex:none;width:22px;height:22px;margin:16px 0 0 4px;border:2.5px solid #cfe0dd;border-top-color:var(--tealD);border-radius:50%;animation:dasp 1s linear infinite}
 .da-avatar{flex:none;width:36px;height:36px;margin-top:6px;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .da-card{flex:1;min-width:0;background:var(--card);border:1.5px solid #d3e3e0;border-radius:28px;padding:22px 26px;box-shadow:0 6px 28px rgba(60,90,85,.05);position:relative}

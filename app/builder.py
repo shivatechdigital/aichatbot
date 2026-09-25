@@ -46,7 +46,12 @@ MAX_CONTEXT_CHARS = 90_000
 ALLOWED_EXT = {"html", "htm", "css", "js", "jsx", "ts", "tsx", "json", "svg", "md", "txt", "xml", "mjs"}
 SANDBOX = "allow-scripts allow-forms allow-modals allow-popups allow-downloads"
 
-KINDS = {"website": "Website", "webapp": "Web Apps", "fullstack": "Fullstack"}
+KINDS = {"website": "Fast", "webapp": "Pro", "fullstack": "Max"}
+KIND_DESCRIPTIONS = {
+    "website": "One HTML file, no extras. The fastest way to see your idea.",
+    "webapp": "React web app for polished wireframes and richer interactions.",
+    "fullstack": "Fullstack with auth and data storage for production workflows.",
+}
 
 STYLE = {
     "A": "Refined and minimal: generous whitespace, an editorial serif/sans type pairing, a muted "
@@ -796,6 +801,8 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-mode,.da-type{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);background:#fbfaf8;border-radius:12px;padding:7px 18px 7px 8px;cursor:pointer;font-size:16px;color:#8d8a84;transition:.15s}
 .da-mode:hover{background:#f1efea}
 .da-mode.on,.da-type.on{background:#e8e6e1;color:var(--ink);border-color:#cfcbc2;font-weight:500}
+.da-mode-copy{display:flex;flex-direction:column;gap:2px;text-align:left}
+.da-mode-description{max-width:210px;color:var(--muted);font-size:11px;line-height:1.25;font-weight:400}
 .da-sugs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;max-width:900px}
 .da-sug{font-family:inherit;border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 15px;font-size:13.5px;color:var(--ink2);cursor:pointer;transition:.15s}
 .da-sug:hover{background:#fff;border-color:var(--line2)}
@@ -2033,7 +2040,9 @@ def builder_page():
                         m.on("click", lambda _e=None, k=k: _set_type(k))
                         with m:
                             _html(TYPE_SVG)
-                            ui.label(lab)
+                            with _div("da-mode-copy"):
+                                ui.label(lab)
+                                ui.label(KIND_DESCRIPTIONS[k]).classes("da-mode-description")
                 with _div("da-sugs"):
                     for s in SUGGESTIONS:
                         sb = ui.element("button").classes("da-sug")

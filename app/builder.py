@@ -1259,6 +1259,9 @@ def builder_page():
 
         _open_modal("Models", fill)
 
+    def _open_models_click() -> None:
+        asyncio.create_task(_open_models())
+
     def _open_snake() -> None:
         def fill(body):
             with body:
@@ -2079,7 +2082,7 @@ def builder_page():
                         "da-model-choice-button",
                         "spark",
                         text="Choose models",
-                        on_click=_open_models,
+                        on_click=_open_models_click,
                         title="Choose the model for each option",
                         size=16,
                     )

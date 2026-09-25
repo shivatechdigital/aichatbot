@@ -820,6 +820,8 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-build-mode.on{border-color:var(--teal);background:var(--tealBg);box-shadow:0 2px 8px rgba(74,125,119,.12)}
 .da-build-mode-title{display:block;color:var(--ink);font-weight:600;font-size:14px}
 .da-build-mode-copy{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.da-build-mode-heading{width:min(620px,92vw);margin:14px auto 0;color:var(--ink);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:left}
+.da-output-heading{margin-top:20px}
 .da-model-choice{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;color:var(--muted);font-size:12px}
 .da-model-choice-label{font-weight:600;text-transform:uppercase;letter-spacing:.08em}
 .da-model-choice-button{border:1px solid var(--line)!important;background:#fff!important;color:var(--ink)!important;padding:8px 14px!important;border-radius:999px!important}
@@ -2065,6 +2067,7 @@ def builder_page():
                             _btn("da-round", "cloud", title="Import a .zip / .html project",
                                  js="() => document.querySelector('.da-up-imp input[type=file]').click()", size=22)
                         _btn("da-send", "up", on_click=_submit, title="Generate", size=24)
+                ui.label("Build mode").classes("da-build-mode-heading")
                 with _div("da-build-modes"):
                     R["build_battle"] = _div("da-build-mode on")
                     R["build_battle"].on("click", lambda _e=None: _set_build_mode("battle"))
@@ -2086,6 +2089,7 @@ def builder_page():
                         title="Choose the model for each option",
                         size=16,
                     )
+                ui.label("Output type").classes("da-build-mode-heading da-output-heading")
                 with _div("da-modes"):
                     for k, lab in KINDS.items():
                         m = _div("da-mode" + (" on" if k == S["type"] else ""))

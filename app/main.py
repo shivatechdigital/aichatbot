@@ -175,12 +175,16 @@ def refresh_profile_display():
         profile_rail_avatar.set_text(user["display_name"][:2].upper())
         profile_menu_name.set_text(user["display_name"])
         profile_menu_email.set_text(user["email"])
-        auth_menu_item.set_text("Log out")
+        auth_menu_container.clear()
+        with auth_menu_container:
+            ui.menu_item("Log out", on_click=handle_auth_action).classes("text-[13px] py-2")
     else:
         profile_rail_avatar.set_text("U")
         profile_menu_name.set_text("Guest")
         profile_menu_email.set_text("Sign in to save chats")
-        auth_menu_item.set_text("Sign in")
+        auth_menu_container.clear()
+        with auth_menu_container:
+            ui.menu_item("Sign in", on_click=handle_auth_action).classes("text-[13px] py-2")
 
 
 def open_settings():
@@ -1423,7 +1427,9 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                             profile_menu_email = ui.label("Sign in to save chats").classes("text-xs text-gray-500 mb-2")
                         ui.separator()
                         ui.menu_item("Settings", on_click=open_settings).classes("text-[13px] py-2")
-                        auth_menu_item = ui.menu_item("Sign in", on_click=handle_auth_action).classes("text-[13px] py-2")
+                        auth_menu_container = ui.element("div")
+                        with auth_menu_container:
+                            ui.menu_item("Sign in", on_click=handle_auth_action).classes("text-[13px] py-2")
 
         # 2. Right Wide Panel
         sidebar_panel = ui.column().classes("sidebar-panel h-full py-3 px-3")

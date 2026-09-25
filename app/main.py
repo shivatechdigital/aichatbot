@@ -1199,7 +1199,7 @@ async def stream_llm(messages, model=None, effort=None):
     requested_model = selected_model if model is None else model
     if requested_model.lower() != "auto":
         payload["model"] = requested_model
-    payload["reasoning_effort"] = effort or selected_effort
+        payload["reasoning_effort"] = effort or selected_effort
 
     headers = {}
     api_key = config.API_KEY.strip()

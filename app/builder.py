@@ -591,14 +591,14 @@ def _model_arg(sel: str | None):
     return None if (not sel or sel == "default") else sel
 
 
-async def _stream_text(messages, sel, on_chunk=None) -> str:
+async def _stream_text(messages, sel, on_chunk=None, effort=None) -> str:
     main = _main_mod()
     # Website generation can legitimately take several minutes for two full projects.
     if hasattr(main, "config"):
         main.config.REQUEST_TIMEOUT = max(main.config.REQUEST_TIMEOUT, 600)
     stream = main.stream_llm
     raw = ""
-    async for chunk in stream(messages, model=_model_arg(sel)):
+    async for chunk in stream(messages, model=_model_arg(sel), effort=effort):
         raw += chunk
         if on_chunk:
             on_chunk(raw, chunk)
@@ -822,6 +822,9 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-build-mode-copy{display:block;color:var(--muted);font-size:12px;margin-top:3px}
 .da-build-mode-heading{width:min(620px,92vw);margin:14px auto 0;color:var(--ink);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:left}
 .da-output-heading{margin-top:20px}
+.da-effort-modes{display:flex;justify-content:center;gap:8px;margin:10px auto 0;max-width:620px;flex-wrap:wrap}
+.da-effort-mode{padding:7px 16px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);cursor:pointer;font-size:13px}
+.da-effort-mode.on{border-color:var(--teal);background:var(--tealBg);color:var(--ink);font-weight:600}
 .da-model-choice{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;color:var(--muted);font-size:12px}
 .da-model-choice-label{font-weight:600;text-transform:uppercase;letter-spacing:.08em}
 .da-model-choice-button{border:1px solid var(--line)!important;background:#fff!important;color:var(--ink)!important;padding:8px 14px!important;border-radius:999px!important}
@@ -1059,7 +1062,7 @@ def builder_page():
     user_name, user_initial = _user_display()
 
     S: dict = {
-        "type": "website", "kind": "website", "build_mode": "battle", "status": "idle", "opt": "A", "view": "preview",
+        "type": "website", "kind": "website", "build_mode": "battle", "effort": "medium", "status": "idle", "opt": "A", "view": "preview",
         "prompt": "", "title": "", "voted": None, "single": False, "refining": False, "editing": False,
         "models": {"A": "default", "B": "default"}, "mname": {"A": "Auto", "B": "Auto"},
         "files": {"A": {}, "B": {}}, "tokens": {"A": "", "B": ""}, "urls": {"A": "", "B": ""},
@@ -1715,7 +1718,7 @@ def builder_page():
 
         _log(opt, f"$ arena generate --option {opt} --model {S['mname'][opt]} --type {S['kind']}")
         try:
-            raw = await _stream_text(_gen_messages(opt), model, on_chunk)
+            raw = await _stream_text(_gen_messages(opt), model, on_chunk, S["effort"])
             _log(opt, f"✓ received {len(raw) / 1000:.1f}k chars in {time.time() - t0:.1f}s")
             files = _parse_files(raw)
             if not files:
@@ -1729,7 +1732,7 @@ def builder_page():
                     _log(opt, f"✗ {pr}")
                 P["cur"] = "repairing…"
                 _log(opt, "$ arena repair")
-                fixed = _parse_files(await _stream_text(_repair_messages(files, probs), model))
+                fixed = _parse_files(await _stream_text(_repair_messages(files, probs), model, effort=S["effort"]))
                 if fixed:
                     files = {**files, **fixed}
                     _log(opt, f"✓ repaired: " + ", ".join(sorted(fixed)))
@@ -1917,7 +1920,7 @@ def builder_page():
             if probs:
                 for pr in probs:
                     _log(opt, f"✗ {pr}")
-                fixed = _parse_files(await _stream_text(_repair_messages(merged, probs), S["models"][opt]))
+                fixed = _parse_files(await _stream_text(_repair_messages(merged, probs), S["models"][opt], effort=S["effort"]))
                 merged = {**merged, **fixed}
                 new = {**new, **fixed}
             S["files"][opt] = merged
@@ -2002,6 +2005,11 @@ def builder_page():
         _cls(R["build_battle"], "on", mode == "battle")
         _cls(R["build_direct"], "on", mode == "direct")
 
+    def _set_effort(effort: str) -> None:
+        S["effort"] = effort
+        for key in ("medium", "high", "xhigh", "max"):
+            _cls(R[f"effort_{key}"], "on", key == effort)
+
     def _use_suggestion(text: str) -> None:
         R["inp"].value = text
         R["inp"].run_method("focus")
@@ -2079,6 +2087,15 @@ def builder_page():
                     with R["build_direct"]:
                         ui.label("Direct").classes("da-build-mode-title")
                         ui.label("Choose one model and build once").classes("da-build-mode-copy")
+                ui.label("Reasoning effort").classes("da-build-mode-heading")
+                with _div("da-effort-modes"):
+                    for effort, label in (("medium", "Normal"), ("high", "High"), ("xhigh", "Extra"), ("max", "Max")):
+                        R[f"effort_{effort}"] = _div(
+                            "da-effort-mode" + (" on" if effort == S["effort"] else "")
+                        )
+                        R[f"effort_{effort}"].on("click", lambda _e=None, value=effort: _set_effort(value))
+                        with R[f"effort_{effort}"]:
+                            ui.label(label)
                 with _div("da-model-choice"):
                     ui.label("Model").classes("da-model-choice-label")
                     _btn(

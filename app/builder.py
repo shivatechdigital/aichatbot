@@ -575,7 +575,11 @@ def _model_arg(sel: str | None):
 
 
 async def _stream_text(messages, sel, on_chunk=None) -> str:
-    stream = _main_mod().stream_llm
+    main = _main_mod()
+    # Website generation can legitimately take several minutes for two full projects.
+    if hasattr(main, "config"):
+        main.config.REQUEST_TIMEOUT = max(main.config.REQUEST_TIMEOUT, 600)
+    stream = main.stream_llm
     raw = ""
     async for chunk in stream(messages, model=_model_arg(sel)):
         raw += chunk
@@ -1774,7 +1778,9 @@ def builder_page():
                     S["models"][option] = model
         S["mname"] = {o: _resolve_model(S["models"][o]) for o in "AB"}
         _render_chat()
-        await asyncio.gather(_gen_one("A"), _gen_one("B"))
+        # Keep the host Copilot CLI from handling two heavyweight generations at once.
+        await _gen_one("A")
+        await _gen_one("B")
         R["tick"].active = False
         _show(R["banner"], False)
         ok = [o for o in "AB" if S["prog"][o]["state"] == "done"]

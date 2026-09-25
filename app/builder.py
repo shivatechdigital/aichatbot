@@ -532,6 +532,20 @@ def _main_mod():
 _MODEL_CACHE: list[str] = []
 
 
+def _quality_models(models: list[str]) -> list[str]:
+    """Prefer capable models for long, multi-file website generation."""
+    preferred_terms = (
+        "gpt-5.4", "gpt-5.5", "gpt-6", "claude-sonnet", "claude-opus"
+    )
+    preferred = [
+        model for model in models
+        if any(term in model.lower() for term in preferred_terms)
+        and "mini" not in model.lower()
+        and "flash" not in model.lower()
+    ]
+    return preferred or models
+
+
 async def _load_models() -> list[str]:
     global _MODEL_CACHE
     if _MODEL_CACHE:
@@ -781,7 +795,7 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 .da-sugs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;max-width:900px}
 .da-sug{font-family:inherit;border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 15px;font-size:13.5px;color:var(--ink2);cursor:pointer;transition:.15s}
 .da-sug:hover{background:#fff;border-color:var(--line2)}
-.da-recent{width:min(860px,92vw);margin-top:38px}
+.da-recent{width:min(860px,92vw);margin-top:38px;max-height:420px;overflow-y:auto;padding-right:6px}
 .da-recent-h{font-family:var(--serif);font-size:20px;margin-bottom:12px;color:var(--ink)}
 .da-rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .da-rc{border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px 16px;cursor:pointer;font-size:14px;color:var(--ink2);display:flex;align-items:center;gap:10px;transition:.15s}
@@ -1064,14 +1078,14 @@ def builder_page():
             return
         box.clear()
         try:
-            projects = list(db.get_all_projects())[:6]
+            projects = list(db.get_all_projects())
         except Exception:
             projects = []
         _show(box, bool(projects))
         if not projects:
             return
         with box:
-            ui.label("Recent designs").classes("da-recent-h")
+            ui.label("All designs").classes("da-recent-h")
             with _div("da-rgrid"):
                 for p in projects:
                     rc = _div("da-rc")
@@ -1726,7 +1740,7 @@ def builder_page():
     async def _start(text: str) -> None:
         if S["status"] == "generating":
             return
-        available_models = await _load_models()
+        available_models = _quality_models(await _load_models())
         available_models = [
             model for model in available_models
             if model and model.lower() != "auto"
@@ -1759,7 +1773,6 @@ def builder_page():
         _sync_input()
         _sync_tabs()
         R["tick"].active = True
-        S["title_task"] = asyncio.create_task(_gen_title(text))
         await asyncio.gather(_gen_one("A"), _gen_one("B"))
         R["tick"].active = False
         _show(R["banner"], False)

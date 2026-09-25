@@ -762,7 +762,7 @@ background:#fff;color:var(--ink2);border-radius:12px;height:44px;padding:0 14px;
 
 /* home */
 .da-home{position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto}
-.da-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 24px 48px;min-height:560px}
+.da-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 24px 48px;min-height:auto}
 .da-h1{font-family:var(--serif);font-size:56px;font-weight:500;letter-spacing:-1.3px;margin:0 0 14px;text-align:center;line-height:1.05}
 .da-sub{display:flex;align-items:center;gap:9px;color:var(--mute);font-size:16px;margin-bottom:34px}
 .da-sub b{font-family:var(--serif);font-weight:500;color:#3a3935;font-size:18px}

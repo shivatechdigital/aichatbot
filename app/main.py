@@ -854,7 +854,7 @@ def add_chat_to_sidebar(title: str):
             with row:
                 # Proper label element so the text actually renders!
                 title_el = ui.label(chat["title"]).classes("chat-title")
-                title_el.on("click", lambda _e=None, c=chat: load_chat(c))
+                title_el.on("click", lambda _e=None, c=chat: load_chat(c) if any(item["id"] == c["id"] for item in chats) else None)
 
                 with ui.row().classes("chat-actions"):
                     ui.button(
@@ -1140,7 +1140,13 @@ def load_chat(chat):
     render_attachments()
     render_messages()
     add_chat_to_sidebar("")
-    ui.run_javascript("resizeComposer(document.querySelector('.message-input textarea'));")
+    ui.timer(
+        0.05,
+        lambda: ui.run_javascript(
+            "resizeComposer(document.querySelector('.message-input textarea'));"
+        ),
+        once=True,
+    )
 
 
 # ============================================================

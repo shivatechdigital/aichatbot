@@ -1726,6 +1726,20 @@ def builder_page():
     async def _start(text: str) -> None:
         if S["status"] == "generating":
             return
+        available_models = await _load_models()
+        available_models = [
+            model for model in available_models
+            if model and model.lower() != "auto"
+        ]
+        if available_models:
+            random_models = [secrets.choice(available_models) for _ in "AB"]
+            if len(available_models) > 1:
+                random_models[1] = secrets.choice(
+                    [model for model in available_models if model != random_models[0]]
+                )
+            for option, model in zip("AB", random_models):
+                if S["models"][option] == "default":
+                    S["models"][option] = model
         S.update(prompt=text, title=_title_from_prompt(text), kind=_detect_kind(text), status="generating",
                  voted=None, single=False, opt="A", chat=[], refining=False, editing=False,
                  urls={"A": "", "B": ""}, pids={"A": None, "B": None}, files={"A": {}, "B": {}},

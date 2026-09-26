@@ -20,6 +20,7 @@ from docx import Document
 from pypdf import PdfReader
 from app.config import config
 from app.database import db
+from app.video_service import VideoService
 
 import app.builder  # noqa: F401 - registers the Website Builder page
 
@@ -129,6 +130,12 @@ active_chat_id = None
 pending_attachments = []
 generation_task = None
 generation_cancelled = False
+video_mode = False
+video_service = VideoService(
+    base_url=os.getenv("VIDEO_API_URL", ""),
+    api_key=os.getenv("VIDEO_API_KEY", ""),
+    timeout=int(os.getenv("VIDEO_TIMEOUT", "1800")),
+)
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
@@ -153,27 +160,6 @@ def logged_in_user() -> dict | None:
     )
 
 
-async def restore_persistent_session():
-    token = await ui.run_javascript("localStorage.getItem('saumya_session')")
-    if not token or logged_in_user():
-        return
-    user = db.get_user_by_session(token)
-    if not user:
-        await ui.run_javascript("localStorage.removeItem('saumya_session')")
-        return
-    nicegui_context.client.storage.update(
-        {**user, "session_token": token}
-    )
-    global chats, current_messages, active_chat_id, chat_counter
-    chats = load_persisted_chats(user["id"])
-    current_messages = []
-    active_chat_id = None
-    chat_counter = max((chat["id"] for chat in chats), default=0) + 1
-    add_chat_to_sidebar("")
-    render_messages()
-    refresh_profile_display()
-
-
 def current_user_id() -> int:
     user = logged_in_user()
     if not user:
@@ -182,11 +168,7 @@ def current_user_id() -> int:
 
 
 def logout():
-    token = nicegui_context.client.storage.get("session_token")
-    if token:
-        db.delete_session(token)
     nicegui_context.client.storage.clear()
-    ui.run_javascript("localStorage.removeItem('saumya_session')")
     refresh_profile_display()
     ui.run_javascript("location.reload()")
 
@@ -983,11 +965,13 @@ def render_messages():
                         "bg-black text-white rounded-full "
                         "w-8 h-8 flex items-center justify-center shrink-0"
                     )
-                    last_assistant_element = ui.html(
-                        format_ai_html(msg["content"])
-                    ).classes(
-                        "message-ai"
-                    )
+                    with ui.column().classes("message-ai"):
+                        if msg.get("video_url"):
+                            ui.video(msg["video_url"]).props("controls").classes("w-full max-w-2xl")
+                            ui.link("Download video", msg["video_url"], new_tab=True).classes("text-sm")
+                        last_assistant_element = ui.html(
+                            format_ai_html(msg["content"])
+                        )
     return last_assistant_element
 
 
@@ -1251,7 +1235,7 @@ async def stream_llm(messages, model=None, effort=None):
 
 
 async def send_message():
-    global current_messages, pending_attachments, selected_model
+    global current_messages, pending_attachments, selected_model, video_mode
     global generation_task, generation_cancelled
 
     text = message_input.value.strip()
@@ -1343,6 +1327,19 @@ async def send_message():
     send_button.classes(add="stop-generation")
 
     try:
+        if video_mode:
+            if not video_service.enabled:
+                raise RuntimeError(
+                    "Video mode is not configured. Start the Colab worker and set VIDEO_API_URL."
+                )
+            assistant_message["content"] = "Generating video..."
+            assistant_element.set_content(format_ai_html(assistant_message["content"]))
+            result = await video_service.generate(text)
+            assistant_message["content"] = result.get("message", "Video generated.")
+            assistant_message["video_url"] = result["video_url"]
+            assistant_element = render_messages()
+            return
+
         api_messages = [
             {
                 "role": message["role"],
@@ -1417,6 +1414,13 @@ def select_model(name: str):
     selected_model = name
     model_button.set_text(f"{name}  ▾")
     model_menu.close()
+
+
+def toggle_video_mode():
+    global video_mode
+    video_mode = not video_mode
+    video_button.set_text("Video" if video_mode else "Think")
+    video_button.classes(add="bg-gray-200" if video_mode else "")
 
 
 def select_effort(value: str):
@@ -1565,9 +1569,10 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     )
                     
                     with ui.row().classes("composer-right-actions items-center no-wrap"):
-                        ui.button(
+                        video_button = ui.button(
                             "Think",
                             icon="psychology",
+                            on_click=toggle_video_mode,
                         ).props("flat dense").classes("composer-think-btn")
                         
                         ui.button(
@@ -1647,7 +1652,6 @@ with ui.dialog() as search_dialog, ui.card().classes("w-[600px] max-w-[90vw]"):
 
 ui.timer(0.1, refresh_model_menu, once=True)
 ui.timer(0.2, refresh_profile_display, once=True) # Run to populate initial profile state
-ui.timer(0.3, restore_persistent_session, once=True)
 
 
 # ============================================================
@@ -1751,11 +1755,6 @@ def submit_auth():
         nicegui_context.client.storage["user_id"] = user_id
         nicegui_context.client.storage["email"] = email
         nicegui_context.client.storage["display_name"] = display_name
-        session_token = db.create_session(user_id)
-        nicegui_context.client.storage["session_token"] = session_token
-        ui.run_javascript(
-            f"localStorage.setItem('saumya_session', {json.dumps(session_token)})"
-        )
         chats = load_persisted_chats(user_id)
         current_messages = []
         active_chat_id = None

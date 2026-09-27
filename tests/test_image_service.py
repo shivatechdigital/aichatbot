@@ -15,14 +15,20 @@ def test_image_generation_requires_api_key(tmp_path):
         service.generate("A red kite in a blue sky")
 
 
-def test_generate_saves_image_and_returns_public_url(tmp_path, monkeypatch):
-    png_bytes = b"fake-png-data"
+def test_generate_saves_jpeg_and_returns_public_url(tmp_path, monkeypatch):
+    image_bytes = b"fake-jpeg-data"
     interaction = SimpleNamespace(
-        output_image=SimpleNamespace(data=base64.b64encode(png_bytes).decode("ascii"))
+        output_image=SimpleNamespace(data=base64.b64encode(image_bytes).decode("ascii"))
     )
+    captured = {}
+
+    def create_interaction(**kwargs):
+        captured.update(kwargs)
+        return interaction
+
     fake_client = SimpleNamespace(
         interactions=SimpleNamespace(
-            create=lambda **kwargs: interaction
+            create=create_interaction
         )
     )
     fake_genai = types.ModuleType("google.genai")
@@ -39,5 +45,7 @@ def test_generate_saves_image_and_returns_public_url(tmp_path, monkeypatch):
     result = service.generate("A red kite in a blue sky")
 
     assert result["image_url"].startswith("/generated-images/")
+    assert result["filename"].endswith(".jpg")
+    assert captured["response_format"]["mime_type"] == "image/jpeg"
     saved_image = tmp_path / result["filename"]
-    assert saved_image.read_bytes() == png_bytes
+    assert saved_image.read_bytes() == image_bytes

@@ -40,7 +40,7 @@ class ImageGenerationService:
             input=prompt.strip(),
             response_format={
                 "type": "image",
-                "mime_type": "image/png",
+                "mime_type": "image/jpeg",
                 "aspect_ratio": "1:1",
                 "image_size": "1K",
             },
@@ -56,7 +56,7 @@ class ImageGenerationService:
             raise RuntimeError("Gemini returned image data that could not be decoded.") from error
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{uuid.uuid4().hex}.png"
+        filename = f"{uuid.uuid4().hex}.jpg"
         (self.output_dir / filename).write_bytes(image_bytes)
         return {
             "image_url": f"{self.public_prefix}/{filename}",

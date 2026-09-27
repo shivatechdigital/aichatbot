@@ -26,3 +26,19 @@ def test_project_publication_is_persisted_and_resolved_by_slug(tmp_path):
     assert publication["project_id"] == project_id
     assert database.get_project_publication(project_id)["slug"] == "beauty-parlour-1"
     assert database.get_publication_by_slug("/beauty-parlour-1/")["project_id"] == project_id
+
+
+def test_user_sessions_are_independent_and_revocable(tmp_path):
+    database = Database(tmp_path / "test.db")
+    user_id = database.create_user("person@example.com", "safe-password", "Person")
+
+    first_session = database.create_session(user_id)
+    second_session = database.create_session(user_id)
+
+    assert database.get_user_by_session(first_session)["id"] == user_id
+    assert database.get_user_by_session(second_session)["id"] == user_id
+
+    database.delete_session(first_session)
+
+    assert database.get_user_by_session(first_session) is None
+    assert database.get_user_by_session(second_session)["id"] == user_id

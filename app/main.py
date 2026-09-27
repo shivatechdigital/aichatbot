@@ -158,15 +158,10 @@ def load_persisted_chats(user_id: int) -> list[dict]:
 
 
 def logged_in_user() -> dict | None:
-    storage = nicegui_context.client.storage
-    user_id = storage.get("user_id")
-    email = storage.get("email")
-    display_name = storage.get("display_name", "User")
-    return (
-        {"id": user_id, "email": email, "display_name": display_name}
-        if user_id and email
-        else None
-    )
+    session_token = nicegui_app.storage.user.get("session_token")
+    if not session_token:
+        return None
+    return db.get_user_by_session(session_token)
 
 
 def current_user_id() -> int:
@@ -177,7 +172,10 @@ def current_user_id() -> int:
 
 
 def logout():
-    nicegui_context.client.storage.clear()
+    storage = nicegui_app.storage.user
+    session_token = storage.pop("session_token", None)
+    if session_token:
+        db.delete_session(session_token)
     refresh_profile_display()
     ui.run_javascript("location.reload()")
 
@@ -1702,10 +1700,9 @@ def save_profile():
         auth_dialog.open()
         return
     try:
-        updated = db.update_user_profile(
+        db.update_user_profile(
             user["id"], profile_name_input.value, profile_email_input.value
         )
-        nicegui_context.client.storage.update(updated)
         refresh_profile_display()
         ui.notify("Profile updated", type="positive")
     except ValueError as error:
@@ -1789,9 +1786,8 @@ def submit_auth():
             if not user:
                 raise ValueError("Invalid email or password")
             user_id, email, display_name = user["id"], user["email"], user["display_name"]
-        nicegui_context.client.storage["user_id"] = user_id
-        nicegui_context.client.storage["email"] = email
-        nicegui_context.client.storage["display_name"] = display_name
+        session_token = db.create_session(user_id)
+        nicegui_app.storage.user["session_token"] = session_token
         chats = load_persisted_chats(user_id)
         current_messages = []
         active_chat_id = None

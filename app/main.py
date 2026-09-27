@@ -20,6 +20,7 @@ from docx import Document
 from pypdf import PdfReader
 from app.config import config
 from app.database import db
+from app.image_service import ImageGenerationService
 from app.video_service import VideoService
 
 import app.builder  # noqa: F401 - registers the Website Builder page
@@ -130,11 +131,19 @@ active_chat_id = None
 pending_attachments = []
 generation_task = None
 generation_cancelled = False
-video_mode = False
+generation_mode = "chat"
 video_service = VideoService(
     base_url=os.getenv("VIDEO_API_URL", ""),
     api_key=os.getenv("VIDEO_API_KEY", ""),
     timeout=int(os.getenv("VIDEO_TIMEOUT", "1800")),
+)
+image_output_dir = Path(os.getenv("IMAGE_OUTPUT_DIR", "data/generated_images")).resolve()
+image_output_dir.mkdir(parents=True, exist_ok=True)
+nicegui_app.add_static_files("/generated-images", str(image_output_dir))
+image_service = ImageGenerationService(
+    api_key=os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", "")),
+    model=os.getenv("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image"),
+    output_dir=image_output_dir,
 )
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -969,6 +978,9 @@ def render_messages():
                         if msg.get("video_url"):
                             ui.video(msg["video_url"]).props("controls").classes("w-full max-w-2xl")
                             ui.link("Download video", msg["video_url"], new_tab=True).classes("text-sm")
+                        if msg.get("image_url"):
+                            ui.image(msg["image_url"]).classes("w-full max-w-2xl rounded-lg")
+                            ui.link("Download image", msg["image_url"], new_tab=True).classes("text-sm")
                         last_assistant_element = ui.html(
                             format_ai_html(msg["content"])
                         )
@@ -1235,7 +1247,7 @@ async def stream_llm(messages, model=None, effort=None):
 
 
 async def send_message():
-    global current_messages, pending_attachments, selected_model, video_mode
+    global current_messages, pending_attachments, selected_model
     global generation_task, generation_cancelled
 
     text = message_input.value.strip()
@@ -1327,7 +1339,20 @@ async def send_message():
     send_button.classes(add="stop-generation")
 
     try:
-        if video_mode:
+        if generation_mode == "image":
+            if not image_service.enabled:
+                raise RuntimeError(
+                    "Image generation is not configured. Add GEMINI_API_KEY to .env."
+                )
+            assistant_message["content"] = "Creating image with Gemini..."
+            assistant_element.set_content(format_ai_html(assistant_message["content"]))
+            result = await asyncio.to_thread(image_service.generate, text)
+            assistant_message["content"] = result.get("message", "Image generated.")
+            assistant_message["image_url"] = result["image_url"]
+            assistant_element = render_messages()
+            return
+
+        if generation_mode == "video":
             if not video_service.enabled:
                 raise RuntimeError(
                     "Video mode is not configured. Start the Colab worker and set VIDEO_API_URL."
@@ -1378,11 +1403,15 @@ async def send_message():
             assistant_message["content"] = "Generation stopped."
         assistant_element.set_content(format_ai_html(assistant_message["content"]))
     except Exception as e:
+        provider = {
+            "image": "Gemini image generation",
+            "video": "Video generation",
+        }.get(generation_mode, "LLM connection")
         assistant_message["content"] = (
-            "⚠️ **LLM connection error**\n\n"
-            f"`{str(e)}`\n\n"
-            f"Endpoint: `{LLM_URL}`"
+            f"⚠️ **{provider} error**\n\n`{str(e)}`"
         )
+        if generation_mode == "chat":
+            assistant_message["content"] += f"\n\nEndpoint: `{LLM_URL}`"
         assistant_element.set_content(format_ai_html(assistant_message["content"]))
 
     finally:
@@ -1416,11 +1445,15 @@ def select_model(name: str):
     model_menu.close()
 
 
-def toggle_video_mode():
-    global video_mode
-    video_mode = not video_mode
-    video_button.set_text("Video" if video_mode else "Think")
-    video_button.classes(add="bg-gray-200" if video_mode else "")
+def select_generation_mode(mode: str):
+    global generation_mode
+    generation_mode = mode
+    labels = {"chat": "Think", "image": "Images", "video": "Video"}
+    icons = {"chat": "psychology", "image": "image", "video": "movie"}
+    mode_button.set_text(labels[mode])
+    mode_button._props["icon"] = icons[mode]
+    mode_button.update()
+    mode_menu.close()
 
 
 def select_effort(value: str):
@@ -1569,11 +1602,15 @@ with ui.row().classes("w-full h-screen gap-0 no-wrap"):
                     )
                     
                     with ui.row().classes("composer-right-actions items-center no-wrap"):
-                        video_button = ui.button(
+                        mode_button = ui.button(
                             "Think",
                             icon="psychology",
-                            on_click=toggle_video_mode,
                         ).props("flat dense").classes("composer-think-btn")
+                        with mode_button:
+                            with ui.menu().classes("model-menu") as mode_menu:
+                                ui.menu_item("Chat", on_click=lambda: select_generation_mode("chat"))
+                                ui.menu_item("Create image", on_click=lambda: select_generation_mode("image"))
+                                ui.menu_item("Create video", on_click=lambda: select_generation_mode("video"))
                         
                         ui.button(
                             icon="mic",

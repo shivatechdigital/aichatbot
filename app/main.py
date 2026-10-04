@@ -139,7 +139,7 @@ image_service = ImageGenerationService(
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
 MAX_ATTACHMENT_FILES = 20
-TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".log"}
+TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".log", ".yaml", ".yml"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
@@ -1647,7 +1647,8 @@ def index() -> None:
             on_upload=handle_upload,
             on_rejected=lambda: ui.notify("File rejected", type="negative"),
         ).props(
-            'accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.py,.log"'
+            # text/* MIME added so OS file pickers reliably list .txt/.md/.log etc.
+            'accept="image/*,text/*,.pdf,.docx,.txt,.md,.csv,.json,.py,.log,.yaml,.yml"'
         ).classes("w-full attachment-upload")
 
 
